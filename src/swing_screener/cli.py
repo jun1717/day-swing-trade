@@ -16,7 +16,12 @@ ChatGPT へ渡すデータ（GitHub Actions の日次実行と同じもの）:
 
     swing chatgpt-export [--date YYYY-MM-DD]   # output/chatgpt/YYYY-MM-DD/ へCSV出力
     swing chatgpt-validate [--date ...]        # 出力済みCSVを検査する
-    swing market-check                         # 新しい営業日の株価が来ているか
+    swing market-check                         # 引け後の新しい確定営業日が来ているか
+
+`chatgpt-export` / `market-check` は **当日セッションの終了前は正式 bundle を
+作らない**（config.yaml: market_session。既定 16:00 JST 以降）。場中の未確定
+日足を「その日の確定データ」として残さないため。両コマンドの `--now` は
+時刻を注入する検証・テスト用オプションで、運用では使わない。
 
 その他:
 
@@ -627,6 +632,22 @@ def forward_export(
 # --- ChatGPT へ渡すデータ ---------------------------------------------------------
 
 
+def _market_session(cfg, now_text: str | None):
+    """market_session 設定と「今」を解決する。
+
+    `--now` は検証・テスト用の時刻注入。実時間に依存したテストを書かないための
+    入口であって、運用では使わない（既定は現在時刻）。
+    """
+    from swing_screener import market_session as session_mod
+
+    try:
+        session = session_mod.load_session(cfg)
+        return session, session_mod.parse_now(now_text, session.tz)
+    except session_mod.SessionConfigError as e:
+        typer.secho(str(e), fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
 def _screening_for(config: str, experimental: str, as_of_text: str | None):
     """ChatGPT 用 export の入力を作る。
 
@@ -669,7 +690,10 @@ def chatgpt_export_cmd(
     ),
     out: str = typer.Option(None, "--out", help="出力先ディレクトリ（既定は output/chatgpt）"),
     skip_existing: bool = typer.Option(
-        False, "--skip-existing", help="同じ日付の bundle が既にあれば何もしない"
+        False, "--skip-existing", help="同じ日付の FINAL bundle が既にあれば何もしない"
+    ),
+    now: str = typer.Option(
+        None, "--now", help="「今」を指定する ISO 8601 日時（検証・テスト用。既定は現在時刻）"
     ),
     config: str = _CONFIG_OPTION,
     experimental: str = _EXPERIMENTAL_OPTION,
@@ -679,17 +703,32 @@ def chatgpt_export_cmd(
     本番スクリーニング結果をそのまま CSV へ写すだけで、売買判定はしない。
     書き出し後に検査を行い、不整合があれば失敗する（中途半端な CSV を
     「その日の最新データ」として残さないため）。
+
+    **当日セッションの終了前は何も書き出さない。** 場中の未確定日足を
+    「その日の確定 bundle」として残すと、引け後の本物の日足で作り直せなくなる
+    （TRADING_RULES.md §1: 引け後に確定日足を確認して翌営業日を決める）。
     """
     from swing_screener import chatgpt_export as export_mod
+    from swing_screener import market_session as session_mod
 
     lookback = lookback_days or export_mod.DEFAULT_BAR_LOOKBACK_DAYS
     cfg, _exp, price_map, run, as_of, warnings = _screening_for(config, experimental, date_)
     for w in warnings:
         typer.secho(f"警告: {w}", fg=typer.colors.YELLOW)
 
+    session, now_dt = _market_session(cfg, now)
+    if not session.is_finalized(as_of, now_dt):
+        # A: 正式 bundle を作らずに正常終了する（保存も artifact も signals もなし）。
+        typer.echo("Market session is not closed yet.")
+        typer.echo("No finalized bundle was generated.")
+        typer.echo(f"  市場データ基準日: {as_of}")
+        typer.echo(f"  確定とみなす時刻: {session.describe()}")
+        typer.echo(f"  現在（{session.timezone}）: {session.localize(now_dt).isoformat(timespec='seconds')}")
+        return
+
     target = export_mod.bundle_dir(as_of, cfg, out)
-    if skip_existing and (target / export_mod.MANIFEST_FILENAME).exists():
-        typer.echo(f"{as_of} の bundle は既にあります（上書きしません）: {target}")
+    if skip_existing and export_mod.is_finalized_bundle(target):
+        typer.echo(f"{as_of} の FINAL bundle は既にあります（上書きしません）: {target}")
         return
 
     try:
@@ -702,6 +741,9 @@ def chatgpt_export_cmd(
             lookback_days=lookback,
             config_path=config,
             experimental_path=experimental,
+            session=session,
+            session_status=session_mod.SESSION_FINAL,
+            generated_at_dt=session.localize(now_dt) if now else None,
         )
     except export_mod.ExportError as e:
         typer.secho(str(e), fg=typer.colors.RED)
@@ -717,7 +759,7 @@ def chatgpt_export_cmd(
         raise typer.Exit(1)
 
     counts = bundle.status_counts()
-    typer.echo(f"データ基準日: {bundle.as_of}")
+    typer.echo(f"データ基準日: {bundle.as_of}（session_status={bundle.session_status}）")
     typer.echo(
         "候補 {total}件（ENTRY_CANDIDATE {e} / NEAR {n} / RANGE {r}）".format(
             total=bundle.candidate_count,
@@ -742,10 +784,20 @@ def chatgpt_validate_cmd(
         None, "--lookback-days", help="daily_bars.csv の上限本数（既定 70営業日）"
     ),
     out: str = typer.Option(None, "--out", help="検査対象ディレクトリの親（既定は output/chatgpt）"),
+    allow_unfinalized: bool = typer.Option(
+        False,
+        "--allow-unfinalized",
+        help="session_status=FINAL でない bundle も検査対象にする（旧形式の確認用）",
+    ),
     config: str = _CONFIG_OPTION,
     experimental: str = _EXPERIMENTAL_OPTION,
 ) -> None:
-    """書き出し済みの ChatGPT 用 CSV を検査する（本番判定との一致も見る）。"""
+    """書き出し済みの ChatGPT 用 CSV を検査する（本番判定との一致も見る）。
+
+    既定では manifest が `session_status=FINAL` であることも要求する。
+    artifact / automation-data へ渡る直前の最後の関門なので、場中の未確定
+    日足で作られた bundle をここで止める。
+    """
     from swing_screener import chatgpt_export as export_mod
 
     lookback = lookback_days or export_mod.DEFAULT_BAR_LOOKBACK_DAYS
@@ -757,7 +809,9 @@ def chatgpt_validate_cmd(
         typer.secho(f"{target} がありません。", fg=typer.colors.RED)
         raise typer.Exit(1)
 
-    errors = export_mod.validate_bundle(target, lookback_days=lookback, run=run)
+    errors = export_mod.validate_bundle(
+        target, lookback_days=lookback, run=run, require_final=not allow_unfinalized
+    )
     if errors:
         typer.secho(f"検査に失敗しました（{len(errors)}件）:", fg=typer.colors.RED)
         for e in errors:
@@ -772,18 +826,27 @@ def market_check(
         "text", "--format", help="text（人間向け）または github（key=value 行）"
     ),
     out: str = typer.Option(None, "--out", help="bundle の親ディレクトリ（既定は output/chatgpt）"),
+    now: str = typer.Option(
+        None, "--now", help="「今」を指定する ISO 8601 日時（検証・テスト用。既定は現在時刻）"
+    ),
     config: str = _CONFIG_OPTION,
 ) -> None:
-    """新しい営業日の株価が来ているかを調べる（市場休日の空振りを避けるため）。
+    """正式 bundle を作るべき状態かを調べる（市場休日と場中の空振りを避ける）。
 
-    祝日を workflow へ書かない代わりに、**キャッシュ済み株価の最新日**と
-    **前回書き出した bundle の日付**を比べる。祝日は株価が更新されないので
-    has_new_data=false になり、bundle を作り直さずに正常終了できる。
+    条件は 2 つあり、両方を満たしたときだけ `has_new_data=true` になる。
+
+    1. **当日セッションが終わっている**（`market_session`。既定 16:00 JST 以降）。
+       場中の未確定日足を「その日の確定 bundle」として残さないため。
+    2. **前回の FINAL bundle より新しい市場日である**。祝日は株価の日付が
+       進まないので false になり、bundle を作り直さずに正常終了できる。
+       比較対象を FINAL に限るので、場中に作られた bundle や旧形式の bundle が
+       同じ日付で残っていても、引け後の正式生成は skip されない。
 
     `--format github` は `key=value` を標準出力へ出すので、GitHub Actions では
     `>> "$GITHUB_OUTPUT"` へ流すだけで後続ステップの条件に使える。
     """
     from swing_screener import chatgpt_export as export_mod
+    from swing_screener import market_session as session_mod
     from swing_screener import screener
 
     cfg = _load_cfg(config)
@@ -792,6 +855,7 @@ def market_check(
 
     market_date = export_mod.latest_market_date(price_map)
     last_export = export_mod.latest_exported_date(cfg, out)
+    last_final = export_mod.latest_finalized_export_date(cfg, out)
 
     if market_date is None:
         # 株価キャッシュが空なのは「市場休日」ではなく異常。休日として握り潰すと
@@ -803,18 +867,41 @@ def market_check(
         )
         raise typer.Exit(1)
 
-    has_new = last_export is None or market_date > last_export
+    session, now_dt = _market_session(cfg, now)
+    session_status = session.status(market_date, now_dt)
+    is_finalized = session_status == session_mod.SESSION_FINAL
+
+    if not is_finalized:
+        has_new, skip_reason = False, "session_not_closed"
+    elif last_final is not None and market_date <= last_final:
+        has_new, skip_reason = False, "already_finalized"
+    else:
+        has_new, skip_reason = True, ""
 
     if format_ == "github":
         typer.echo(f"has_new_data={'true' if has_new else 'false'}")
-        typer.echo(f"market_date={market_date.isoformat() if market_date else ''}")
+        typer.echo(f"market_date={market_date.isoformat()}")
+        typer.echo(f"session_status={session_status}")
+        typer.echo(f"is_finalized={'true' if is_finalized else 'false'}")
         typer.echo(f"last_export_date={last_export.isoformat() if last_export else ''}")
+        typer.echo(
+            f"last_final_export_date={last_final.isoformat() if last_final else ''}"
+        )
+        typer.echo(f"skip_reason={skip_reason}")
+        typer.echo(f"now_market_tz={session.localize(now_dt).isoformat(timespec='seconds')}")
         return
 
     typer.echo(f"株価キャッシュの最新日: {market_date}")
-    typer.echo(f"前回書き出した bundle: {last_export or 'なし'}")
+    typer.echo(f"現在（{session.timezone}）: {session.localize(now_dt).isoformat(timespec='seconds')}")
+    typer.echo(f"当日セッション: {session_status}（確定とみなす時刻 {session.describe()}）")
+    typer.echo(f"前回の FINAL bundle: {last_final or 'なし'}")
+    if last_export is not None and last_export != last_final:
+        typer.echo(f"（FINAL でない bundle が {last_export} に残っています）")
     if has_new:
-        typer.secho("新しい営業日のデータがあります。", fg=typer.colors.GREEN)
+        typer.secho("新しい営業日の確定データがあります。", fg=typer.colors.GREEN)
+    elif skip_reason == "session_not_closed":
+        typer.echo("Market session is not closed yet.")
+        typer.echo("No finalized bundle was generated.")
     else:
         typer.echo("No new market data（市場休日または未更新。書き出しは不要です）")
 

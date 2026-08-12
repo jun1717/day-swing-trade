@@ -35,6 +35,16 @@ stop:
 
 # --- 以下はルールではなく実行環境の設定 ---
 
+# 市場セッションの確定判定（**売買パラメータではない / データ確定待ちの運用設定**）
+#   TRADING_RULES.md §1「引け後に確定日足を確認 → 翌営業日の行動を決める」を
+#   守るため、当日セッションが終わる前の未確定日足を正式 bundle にしない。
+#   close_time     東証の大引け（市場の事実）。これより前は絶対に FINAL にしない
+#   finalize_after データ提供元(yfinance)の更新待ちを見込んだ安全側の時刻
+market_session:
+  timezone: Asia/Tokyo
+  close_time: "15:30"
+  finalize_after: "16:00"
+
 data:
   provider: yfinance
   suffix: ".T"

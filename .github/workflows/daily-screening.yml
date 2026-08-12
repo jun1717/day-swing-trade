@@ -8,6 +8,12 @@
 # 結果を CSV にして artifact へ置く」ことだけで、買う / まだ待つ / 見送るの
 # 判断は人間が日足を見て行う。チャート画像は生成しない（入力はテキストのみ）。
 #
+# **正式 bundle は確定日足ベースのものだけ。** 当日セッション終了前
+# （config.yaml: market_session、既定 16:00 JST）に workflow_dispatch で
+# 手動実行した場合は、market-check が has_new_data=false を返し、
+# daily / export / artifact / 永続化のすべてを飛ばして正常終了する。
+# 場中の未確定日足が「その日の最終 bundle」として残ることはない。
+#
 # 手入力データである data/trades.csv には触れない（下の検査ステップで固定）。
 
 name: daily-screening
@@ -84,22 +90,34 @@ jobs:
       - name: Fetch prices
         run: swing fetch
 
-      # 祝日・市場休日の判定。祝日は fetch が成功しても株価の日付が進まないので
-      # has_new_data=false になり、以降のステップを丸ごと飛ばして正常終了する。
-      # fetch 自体が失敗した場合は上のステップで既に workflow が落ちている
-      # （休日扱いにはしない）。取得が全滅して株価キャッシュが空になった場合も
-      # market-check が失敗するので、休日として静かに成功することはない。
-      - name: Check for new market data
+      # 「正式 bundle を作ってよいか」の判定。2 つを同時に見る。
+      #   1. 当日セッションが終わっているか（Asia/Tokyo 基準・既定 16:00 以降）
+      #   2. 前回の **FINAL** bundle より新しい市場日か
+      # 祝日は fetch が成功しても株価の日付が進まないので 2 で false になる。
+      # 場中の手動実行は 1 で false になる。どちらも以降のステップを丸ごと
+      # 飛ばして正常終了する。fetch 自体が失敗した場合は上のステップで既に
+      # workflow が落ちている（休日扱いにはしない）。取得が全滅して株価
+      # キャッシュが空になった場合も market-check が失敗するので、休日として
+      # 静かに成功することはない。
+      - name: Check for new finalized market data
         id: market
         run: python -m swing_screener.cli market-check --format github >> "$GITHUB_OUTPUT"
 
-      - name: No new market data
+      - name: No finalized bundle
         if: steps.market.outputs.has_new_data != 'true'
         run: |
-          echo "No new market data (市場休日または株価未更新)"
-          echo "  株価キャッシュの最新日: ${{ steps.market.outputs.market_date }}"
-          echo "  前回書き出した bundle:  ${{ steps.market.outputs.last_export_date }}"
-          echo "新しい bundle は作らず、前回の bundle も上書きしない。"
+          if [ "${{ steps.market.outputs.skip_reason }}" = "session_not_closed" ]; then
+            echo "Market session is not closed yet."
+            echo "No finalized bundle was generated."
+          else
+            echo "No new market data (市場休日または株価未更新)"
+          fi
+          echo "  株価キャッシュの最新日:     ${{ steps.market.outputs.market_date }}"
+          echo "  当日セッション:             ${{ steps.market.outputs.session_status }}"
+          echo "  現在(Asia/Tokyo):           ${{ steps.market.outputs.now_market_tz }}"
+          echo "  前回の FINAL bundle:        ${{ steps.market.outputs.last_final_export_date }}"
+          echo "新しい bundle は作らず、前回の FINAL bundle も上書きしない。"
+          echo "automation-data への保存も artifact 生成も行わない。"
 
       - name: Screen and record (daily)
         if: steps.market.outputs.has_new_data == 'true'
@@ -111,6 +129,8 @@ jobs:
 
       # export の中でも検査しているが、artifact へ上げる直前にもう一度回す。
       # 中途半端な CSV を「その日の正常な最新データ」として残さないため。
+      # 検査には manifest の session_status=FINAL も含まれる（未確定日足の
+      # bundle が artifact / automation-data へ渡らないことの最後の関門）。
       - name: Validate exported CSV
         if: steps.market.outputs.has_new_data == 'true'
         run: swing chatgpt-validate
@@ -183,6 +203,7 @@ jobs:
             echo "## ChatGPT 用市場データ"
             echo ""
             echo "- データ基準日: ${{ steps.market.outputs.market_date }}"
+            echo "- 確定状態: ${{ steps.market.outputs.session_status }}（引け後の確定日足）"
             echo "- artifact: \`chatgpt-market-data-${{ steps.market.outputs.market_date }}\`"
             echo ""
             echo '```'

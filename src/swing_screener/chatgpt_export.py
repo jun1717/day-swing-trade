@@ -20,6 +20,12 @@ truth である（tests/test_chatgpt_export.py が本番結果との一致を固
 daily_bars.csv には「そのとき存在しなかった情報」を入れない。列は生の OHLCV と
 MA25 だけで、現在のレンジ判定を過去の行へコピーするようなことはしない。
 MA25 はその日までの終値だけで決まるので過去行に入れてよい。
+
+manifest.txt は `session_status` で **その bundle が確定日足ベースかどうか** を
+明示する。永続化・artifact 化してよいのは `session_status=FINAL` のものだけで、
+「前回どこまで書き出したか」の比較対象も FINAL の bundle だけである
+（場中に作られた bundle が残っていても、引け後の正式生成を妨げない）。
+確定判定そのものは `market_session.py` が持つ（ここでは時刻判定をしない）。
 """
 
 from __future__ import annotations
@@ -27,6 +33,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import os
+import re
 import subprocess
 from dataclasses import dataclass, field
 from datetime import date, datetime
@@ -34,6 +41,7 @@ from pathlib import Path
 from typing import Any, Iterable, Sequence
 
 from .indicators.ma import calc_ma_series
+from .market_session import SESSION_FINAL, MarketSession
 from .models import (
     STATUS_ENTRY,
     STATUS_NEAR,
@@ -222,8 +230,49 @@ def bundle_dir(as_of: date, cfg: Any = None, out_dir: Path | str | None = None) 
     return bundle_root(cfg, out_dir) / as_of.isoformat()
 
 
-def exported_dates(cfg: Any = None, out_dir: Path | str | None = None) -> list[date]:
-    """書き出し済みの日付（昇順）。manifest.txt があるものだけを完成とみなす。"""
+_META_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def read_manifest_meta(directory: Path | str) -> dict[str, str]:
+    """manifest.txt の `key=value` 行を dict にする（無ければ空 dict）。
+
+    キーが識別子の形をしている行だけを拾う。後半の散文に `=` が混ざっても
+    メタ情報を上書きしないようにするため。
+    """
+    path = Path(directory) / MANIFEST_FILENAME
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return {}
+    meta: dict[str, str] = {}
+    for line in text.splitlines():
+        if line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        if _META_KEY_RE.match(key):
+            meta[key] = value
+    return meta
+
+
+def is_finalized_bundle(directory: Path | str) -> bool:
+    """その bundle が確定日足ベース（FINAL）として書かれたか。
+
+    `session_status` を持たない bundle は **FINAL とみなさない**。場中に作られた
+    可能性を排除できないためで、引け後の正式生成で上書きされるのが正しい。
+    """
+    return read_manifest_meta(directory).get("session_status") == SESSION_FINAL
+
+
+def exported_dates(
+    cfg: Any = None,
+    out_dir: Path | str | None = None,
+    *,
+    finalized_only: bool = False,
+) -> list[date]:
+    """書き出し済みの日付（昇順）。manifest.txt があるものだけを完成とみなす。
+
+    `finalized_only=True` なら `session_status=FINAL` の bundle だけを数える。
+    """
     root = bundle_root(cfg, out_dir)
     if not root.exists():
         return []
@@ -232,9 +281,12 @@ def exported_dates(cfg: Any = None, out_dir: Path | str | None = None) -> list[d
         if not child.is_dir() or not (child / MANIFEST_FILENAME).exists():
             continue
         try:
-            dates.append(date.fromisoformat(child.name))
+            stamp = date.fromisoformat(child.name)
         except ValueError:
             continue
+        if finalized_only and not is_finalized_bundle(child):
+            continue
+        dates.append(stamp)
     return sorted(dates)
 
 
@@ -242,6 +294,18 @@ def latest_exported_date(
     cfg: Any = None, out_dir: Path | str | None = None
 ) -> date | None:
     dates = exported_dates(cfg, out_dir)
+    return dates[-1] if dates else None
+
+
+def latest_finalized_export_date(
+    cfg: Any = None, out_dir: Path | str | None = None
+) -> date | None:
+    """前回の **FINAL** bundle の日付。stale 判定はこれと比べる。
+
+    場中 bundle や旧形式の bundle が同じ日付で残っていても、引け後の正式生成が
+    「前回と同じ市場日だから」と skip されないようにするための区別。
+    """
+    dates = exported_dates(cfg, out_dir, finalized_only=True)
     return dates[-1] if dates else None
 
 
@@ -487,16 +551,41 @@ def build_manifest_lines(
     config_path: Path | str | None,
     experimental_path: Path | str | None,
     generated_at: str | None = None,
+    session: MarketSession | None = None,
+    session_status: str = SESSION_FINAL,
+    generated_at_dt: datetime | None = None,
 ) -> list[str]:
     counts = run.counts()
     by_status: dict[str, int] = {s: 0 for s in EXPORT_STATUSES}
     for row in candidate_rows:
         by_status[row["status"]] = by_status.get(row["status"], 0) + 1
 
+    session = session or MarketSession()
+    # generated_at は runner の時刻（GitHub Actions では UTC）なので、日本時間も
+    # 併記する。「引け後のデータか」を人間が manifest だけで確認できるようにする。
+    # 2 つの行が食い違わないよう、同じ 1 つの datetime から両方を作る。
+    stamp_dt = generated_at_dt
+    if stamp_dt is None and generated_at:
+        try:
+            stamp_dt = datetime.fromisoformat(generated_at)
+        except ValueError:
+            stamp_dt = None
+    if stamp_dt is None:
+        stamp_dt = datetime.now().astimezone()
+    if stamp_dt.tzinfo is None:
+        stamp_dt = stamp_dt.replace(tzinfo=session.tz)
+    local_stamp = stamp_dt.astimezone(session.tz)
+
     lines = [
         "# ChatGPT 分析用データ (swing-screener chatgpt-export)",
-        f"generated_at={generated_at or datetime.now().astimezone().isoformat(timespec='seconds')}",
+        f"generated_at={generated_at or stamp_dt.isoformat(timespec='seconds')}",
+        f"generated_at_market_tz={local_stamp.isoformat(timespec='seconds')}",
         f"market_data_as_of={as_of.isoformat()}",
+        f"session_status={session_status}",
+        f"is_finalized={'true' if session_status == SESSION_FINAL else 'false'}",
+        f"market_timezone={session.timezone}",
+        f"session_close_time={session.close_time.strftime('%H:%M')}",
+        f"session_finalize_after={session.finalize_time.strftime('%H:%M')}",
         f"git_commit_sha={git_sha}",
         f"screener_version={_screener_version()}",
         f"universe_count={len(run.results)}",
@@ -532,6 +621,11 @@ def build_manifest_lines(
             "その日には存在しなかった判定結果を過去の行へ埋め込んでいません。",
             "OUT の銘柄は含みません。候補が 0 件の日は candidate_count=0 で、"
             "CSV はヘッダーのみになります（条件を緩めて候補を作ることはしません）。",
+            # ここは散文なので `key=value` の形にしない（manifest のメタ行と
+            # 混ざらないようにするため）。
+            f"session_status が {SESSION_FINAL} の bundle は、market_data_as_of の"
+            f"取引が終了したあとの確定日足で作られたものです（{session.describe()}）。"
+            "永続化・artifact 化されるのは FINAL の bundle だけです。",
         ]
     )
     return lines
@@ -552,6 +646,7 @@ class Bundle:
     candidate_rows: list[dict[str, str]] = field(default_factory=list)
     bar_rows: list[dict[str, str]] = field(default_factory=list)
     lookback_days: int = DEFAULT_BAR_LOOKBACK_DAYS
+    session_status: str = SESSION_FINAL
 
     @property
     def candidate_count(self) -> int:
@@ -590,10 +685,16 @@ def write_bundle(
     config_path: Path | str | None = None,
     experimental_path: Path | str | None = None,
     generated_at: str | None = None,
+    session: MarketSession | None = None,
+    session_status: str = SESSION_FINAL,
+    generated_at_dt: datetime | None = None,
 ) -> Bundle:
     """`output/chatgpt/YYYY-MM-DD/` へ 3 ファイルを書き出す。
 
     候補 0 件でもヘッダーだけの CSV を正しく作る（0 件は異常ではない）。
+
+    `session_status` は呼び出し側（CLI）が `market_session` で判定して渡す。
+    ここで時刻判定はしない（このモジュールは判定をしないという約束のため）。
     """
     stamp = as_of or run.as_of
     if stamp is None:
@@ -624,6 +725,9 @@ def write_bundle(
         config_path=config_path,
         experimental_path=experimental_path,
         generated_at=generated_at,
+        session=session,
+        session_status=session_status,
+        generated_at_dt=generated_at_dt,
     )
     manifest_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -636,6 +740,7 @@ def write_bundle(
         candidate_rows=candidate_rows,
         bar_rows=bar_rows,
         lookback_days=lookback_days,
+        session_status=session_status,
     )
 
 
@@ -665,12 +770,16 @@ def validate_bundle(
     lookback_days: int = DEFAULT_BAR_LOOKBACK_DAYS,
     run: ScreeningRun | None = None,
     today: date | None = None,
+    require_final: bool = True,
 ) -> list[str]:
     """書き出した 3 ファイルを検査し、見つかった不整合を全部返す。
 
     `run` を渡すと本番スクリーニング結果との一致も検査する
     （status・銘柄集合・初期STOP）。中途半端な CSV を「その日の正しい最新
     データ」として残さないための最後の関門なので、1 件目で止めずに全部集める。
+
+    `require_final=True`（既定）では manifest の `session_status=FINAL` も要求する。
+    artifact へ上げる直前の関門なので、未確定日足の bundle をここで止める。
     """
     directory = Path(directory)
     errors: list[str] = []
@@ -684,6 +793,17 @@ def validate_bundle(
             errors.append(f"{path.name} がない")
     if errors:
         return errors
+
+    # --- 確定状態 ---
+    # 以降の検査より先に見る。CSV の形が壊れていて早期 return しても、
+    # 「未確定日足の bundle だった」という最も重要な事実は必ず報告する。
+    meta = read_manifest_meta(directory)
+    if require_final and meta.get("session_status") != SESSION_FINAL:
+        errors.append(
+            f"{MANIFEST_FILENAME} が session_status={SESSION_FINAL} ではない"
+            f"（実際: {meta.get('session_status') or 'なし'}）。"
+            "場中の未確定日足、または session_status を持たない旧形式の bundle。"
+        )
 
     # --- candidates.csv ---
     header, rows = _read_csv(candidates_path)
@@ -786,11 +906,6 @@ def validate_bundle(
 
     # --- manifest.txt ---
     manifest = manifest_path.read_text(encoding="utf-8")
-    meta = dict(
-        line.split("=", 1)
-        for line in manifest.splitlines()
-        if "=" in line and not line.startswith("#")
-    )
     if meta.get("candidate_count") != str(len(rows)):
         errors.append(
             f"{MANIFEST_FILENAME} の candidate_count {meta.get('candidate_count')} が "

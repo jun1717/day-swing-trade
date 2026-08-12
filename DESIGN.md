@@ -81,6 +81,8 @@
 │   │   ├── rebound.py       # 反発確認
 │   │   └── status.py        # OUT/RANGE/NEAR/ENTRY_CANDIDATE 分類＋並び順
 │   ├── screener.py          # パイプライン統合
+│   ├── market_session.py    # 当日セッションの確定判定（運用設定・売買ルールではない）
+│   ├── chatgpt_export.py    # ChatGPT 分析用 CSV の書き出し（判定はしない）
 │   ├── charting.py          # 詳細チャートPNG
 │   ├── explain.py           # 判定理由テキスト生成
 │   ├── cli.py               # typer
@@ -138,6 +140,11 @@ output/screening_YYYY-MM-DD.json
 
 ### config.yaml — 確定値のみ
 CODEX_HANDOFF §28 の確定値を置く。ここの値を実装者が勝手に変えない。
+
+末尾の `--- 以下はルールではなく実行環境の設定 ---` 以降（`data` / `output` /
+`chart` / `market_session`）は**売買ルールではない**。特に `market_session`
+（Asia/Tokyo・大引け 15:30・データ確定待ち 16:00）は「当日セッション終了前の
+未確定日足を正式 bundle にしない」ための運用設定で、売買パラメータではない。
 
 ### experimental.yaml — 未確定値のみ
 冒頭に「これは確定した売買ルールではない」と明記。全項目にコメントで
@@ -222,7 +229,12 @@ UI の「なぜその判定なのか」表示はこれを描画するだけで�
 - `volatility_change > exp.range_quality.max_volatility_change`（値幅拡大中）
 
 **品質スコア** `quality`（0〜1、重みは experimental）:
-- 幅の狭さ / `lower_touch_count >= range.min_lower_touches` / ボラ収縮 / 出来高減少 / 日数の長さ
+- 幅の狭さ / 下限反応 / ボラ収縮 / 出来高減少 / 日数の長さ
+- 下限反応の得点は `min(lower_touch_count / range.min_lower_touches, 1.0)`。
+  つまり **`min_lower_touches` は「満点になる目標値」であって除外条件ではない**
+  （上の除外条件の一覧に下限反応回数が入っていないのはそのため）。
+  1回でも総合スコアが `min_quality` を超えればレンジは成立する。
+  詳細と経緯は `TRADING_RULES.md` §3.3。
 
 全 window のうち quality 最大のものを採用。`quality < exp.range_quality.min_quality`
 なら「良いレンジなし」として OUT。

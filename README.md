@@ -95,11 +95,24 @@ swing fetch  →  swing daily  →  swing chatgpt-export
 を実行し、その日の候補を ChatGPT へ渡せる CSV にして artifact へ置く。
 Actions の画面から `Run workflow`（`workflow_dispatch`）で手動実行もできる。
 
-* **日本の祝日は cron に書いていない。** 平日は毎日起動し、`fetch` 成功後に
-  `market-check` で「前回書き出した日より新しい株価が来ているか」を見る。
-  来ていなければ `No new market data` として **何も作らずに正常終了**する
-  （前回の bundle も上書きしない）。`fetch` 自体が失敗した場合は休日扱いにせず
-  workflow を失敗させる。
+* **正式 bundle は引け後の確定日足だけ。** `fetch` 成功後に `market-check` が
+  2 つを同時に見て、両方を満たしたときだけ後続ステップへ進む。
+
+  1. **当日セッションが終わっているか**（`config.yaml: market_session`。
+     Asia/Tokyo 基準で大引け 15:30 + データ確定待ちの 16:00 以降）
+  2. **前回の FINAL bundle より新しい市場日か**
+
+  場中に手動実行した場合は 1 で止まり、`Market session is not closed yet.` /
+  `No finalized bundle was generated.` と表示して **何も作らずに正常終了**する
+  （`swing daily` も走らないので signals も日次記録も増えない）。
+* **日本の祝日は cron に書いていない。** 平日は毎日起動し、祝日は株価の日付が
+  進まないので 2 で止まり `No new market data` として正常終了する
+  （前回の FINAL bundle も上書きしない）。`fetch` 自体が失敗した場合は
+  休日扱いにせず workflow を失敗させる。
+* 比較対象を **FINAL の bundle に限る**ので、場中に作られた bundle や旧形式の
+  bundle が同じ日付で残っていても、引け後の正式生成は skip されない
+  （その場で上書きされる）。引け後に同じ日付で再実行した場合は
+  すでに FINAL があるので冪等に skip する。
 * 定期実行と手動実行が重なっても同じ日次データを同時に更新しないよう
   `concurrency` で直列化している。
 * 権限は `contents: write` のみ（生成データ用ブランチへの push に必要）。
@@ -145,7 +158,21 @@ Actions と同じものをローカルでも作れる（ロジックは workflow
 |---|---|
 | `candidates.csv` | その日の候補 1 銘柄 = 1 行。ENTRY_CANDIDATE / NEAR / RANGE のみ（**OUT は入れない**）。ENTRY・NEAR が `PRIMARY`、RANGE が `SECONDARY` |
 | `daily_bars.csv` | 候補全銘柄 × 直近 70 営業日の生の日足（date, code, OHLCV, ma25, days_ago） |
-| `manifest.txt` | 生成日時・データ基準日・commit sha・件数・config のハッシュなど出所の記録 |
+| `manifest.txt` | 生成日時（UTC と JST の両方）・データ基準日・**確定状態**・commit sha・件数・config のハッシュなど出所の記録 |
+
+manifest 先頭の確定状態は次のように出る。**`FINAL` 以外が artifact や
+`automation-data` に入ることはない**（`chatgpt-validate` が最後に検査する）。
+
+```text
+generated_at=2026-08-12T07:10:12+00:00
+generated_at_market_tz=2026-08-12T16:10:12+09:00
+market_data_as_of=2026-08-12
+session_status=FINAL
+is_finalized=true
+market_timezone=Asia/Tokyo
+session_close_time=15:30
+session_finalize_after=16:00
+```
 
 **この書き出しは売買判定をしない。** 本番スクリーニング結果をそのまま CSV に
 写すだけで、レンジ再判定も ENTRY 再判定もレンジ内位置ガードの再評価もしない
@@ -185,7 +212,7 @@ uv pip install -e ".[dev]"
 |---|---|
 | `fetch` | 株価取得 → `cache/prices/`。当日取得済みはスキップ（`--force` で強制） |
 | `daily` | スクリーニング + 記録 + 保有レビュー。**通常はこれ 1 つ** |
-| `chatgpt-export` | ChatGPT 分析用 CSV を `output/chatgpt/YYYY-MM-DD/` へ書き出す（`--date` `--lookback-days` `--skip-existing`） |
+| `chatgpt-export` | ChatGPT 分析用 CSV を `output/chatgpt/YYYY-MM-DD/` へ書き出す（`--date` `--lookback-days` `--skip-existing` `--now`）。**当日セッション終了前は何も作らない** |
 | `serve` | Web UI 起動（`--port 8000`） |
 | `holdings` | 保有銘柄の当日レビュー（`--closed` で決済済み一覧） |
 | `buy CODE --price P` | 購入を記録。`--qty` `--date` `--stop` `--lower` `--upper` `--reason` `--memo` |
@@ -201,7 +228,7 @@ uv pip install -e ".[dev]"
 | `trade-chart CODE` | 保有銘柄のチャートPNG（`--as-of YYYY-MM-DD` で当時の形を再現） |
 | `forward-export` | フォワード検証用の素データを 1 枚の CSV に書き出す |
 | `chatgpt-validate` | 書き出し済みの ChatGPT 用 CSV を検査する（本番判定との一致も見る） |
-| `market-check` | 新しい営業日の株価が来ているか（`--format github` で `key=value` 出力） |
+| `market-check` | 引け後の新しい確定営業日が来ているか（`--format github` で `key=value` 出力、`--now` で時刻注入） |
 
 全コマンドで `--config` / `--experimental` を指定でき、設定違いの結果を比較できる。
 
@@ -322,7 +349,8 @@ ENTRY_CANDIDATE が出た日を、**実際に買わなかったものも含め�
 ```text
 価格帯                 2,000 〜 7,000円
 上昇トレンドの必須条件  close > MA25
-短期レンジ             3〜10営業日 / 下限反応 2回以上 / 境界は zone
+短期レンジ             3〜10営業日 / 境界は zone / 総合品質で成立を判定
+下限反応               2回で満点の評価軸。必須条件ではない（TRADING_RULES §3.3）
 ENTRYトリガー          終値 > 前日高値
 初期STOP               range_lower × 0.995
 ポジションサイズ        自動化しない
@@ -427,8 +455,13 @@ CSV を直接編集してもよい。次のリクエストで画面に反映さ�
 
 ## `config.yaml` — 確定値
 
-株価フィルタ 2,000〜7,000円 / MA25 / レンジ 3〜10営業日 / 下限反応 2回 /
+株価フィルタ 2,000〜7,000円 / MA25 / レンジ 3〜10営業日 /
+下限反応 2回（**品質スコアで満点になる目標値**。必須条件ではない） /
 損切り＝下限の0.5%下。**これらは確定した売買ルールなので通常は変えない。**
+
+`market_session`（Asia/Tokyo / 大引け 15:30 / データ確定待ち 16:00）だけは
+**売買ルールではなく運用設定**で、「当日セッション終了前の未確定日足を正式
+bundle にしない」ためにある。
 
 保存先を変えたい場合だけ、次の任意キーを足せる（省略時は既定値）。
 

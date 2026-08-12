@@ -527,9 +527,9 @@ def test_同じ日に再実行しても内容が変わらない(project):
 
     assert (directory / "candidates.csv").read_bytes() == first_candidates
     assert (directory / "daily_bars.csv").read_bytes() == first_bars
-    # manifest は generated_at だけが動く
+    # manifest は生成時刻の行だけが動く（UTC 表記と市場時間帯表記の 2 行）
     def without_timestamp(text: str) -> list[str]:
-        return [ln for ln in text.splitlines() if not ln.startswith("generated_at=")]
+        return [ln for ln in text.splitlines() if not ln.startswith("generated_at")]
 
     assert without_timestamp((directory / "manifest.txt").read_text(encoding="utf-8")) == (
         without_timestamp(first_manifest)
