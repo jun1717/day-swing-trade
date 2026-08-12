@@ -1,0 +1,26 @@
+# ChatGPT 分析用データ (swing-screener chatgpt-export)
+generated_at=2026-08-12T03:45:48+00:00
+market_data_as_of=2026-08-12
+git_commit_sha=e5c92873bddeaf99914358fc6141d951aee901f5
+screener_version=0.1.0
+universe_count=98
+candidate_count=22
+entry_candidate_count=2
+near_count=12
+range_count=8
+out_count=76
+bars_count=1540
+bar_lookback_days=70
+candidates_file=candidates.csv
+daily_bars_file=daily_bars.csv
+config_file=config.yaml
+config_sha256=37e47d962a2de64ce5c2647578639ff4754c9bb6b6fd0412cda6768afcf6c589
+experimental_file=experimental.yaml
+experimental_sha256=e82d37fff7d91df18d794122df848b3653d794f380a5e97d99840c3696021b91
+
+# このデータの性格
+This bundle is analysis input only. Production trading logic was not recalculated or modified by this export.
+このデータは分析のための入力です。本番の売買判定は、この書き出しによって再計算も変更もされていません。
+candidates.csv の値と reason 列は、本番スクリーニング結果（ScreenResult / Judgement）をそのまま写したものです。この書き出しでレンジ判定・ENTRY判定・レンジ内位置の再評価は行っていません。
+daily_bars.csv は生の日足と MA25 だけです。その日には存在しなかった判定結果を過去の行へ埋め込んでいません。
+OUT の銘柄は含みません。候補が 0 件の日は candidate_count=0 で、CSV はヘッダーのみになります（条件を緩めて候補を作ることはしません）。
