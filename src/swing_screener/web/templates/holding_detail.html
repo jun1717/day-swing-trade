@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}{{ trade.code }} {{ trade.name }}（保有） — 日足短期スイング スクリーナー{% endblock %}
+{% block body_class %}detail-page{% endblock %}
+{% block body %}
+
+<div class="page-header">
+  <h1><a href="/holdings" style="color:inherit; text-decoration:none;">保有銘柄</a></h1>
+  <div class="header-spacer"></div>
+  <a href="/holdings" class="btn btn-sm">← 保有一覧へ戻る</a>
+  <a href="/stock/{{ code }}" class="btn btn-sm">スクリーニング判定を見る</a>
+</div>
+
+<div class="container">
+
+  <div class="detail-header">
+    <h1>{{ trade.code }} {{ trade.name }}</h1>
+    <span class="badge level-{{ view.level|lower }}">{{ view.level }}</span>
+    <span class="close-price">{{ view.close|yen }}</span>
+    <span class="detail-sub">
+      {% if trade.is_open %}保有中{% else %}決済済み{% endif %}
+      {% if view.pnl_pct is not none %} ・ 損益 {{ view.pnl_pct|pct }}{% endif %}
+      {% if trade.entry_date %} ・ ENTRY {{ trade.entry_date|datefmt }} {{ trade.entry_price|yen }}{% endif %}
+      {% if trade.quantity %} × {{ trade.quantity }}株{% endif %}
+    </span>
+  </div>
+
+  <div class="level-banner level-{{ view.level|lower }}">
+    <b>{{ level_labels.get(view.level, view.level) }}</b>
+    — {{ level_descriptions.get(view.level, "") }}
+  </div>
+
+  {% if view.note %}<div class="warning-box">{{ view.note }}</div>{% endif %}
+
+  <div class="detail-nav">
+    {% if prev_code %}<a class="btn btn-sm" href="/holdings/{{ prev_code }}">← {{ prev_code }}</a>{% endif %}
+    {% if next_code %}<a class="btn btn-sm" href="/holdings/{{ next_code }}">{{ next_code }} →</a>{% endif %}
+    <span class="spacer"></span>
+    <div class="day-toggle">
+      {% for d in day_options %}
+      <a href="/holdings/{{ code }}?days={{ d }}" class="{% if d == chart_days %}active{% endif %}">{{ d }}日</a>
+      {% endfor %}
+    </div>
+    <a class="btn btn-sm" href="/holding-chart/{{ code }}.png?days={{ chart_days }}" download="{{ code }}_holding.png">⭳ チャートPNG</a>
+    {% if trade.entry_date %}
+    <a class="btn btn-sm" href="/holding-chart/{{ code }}.png?days={{ chart_days }}&as_of={{ trade.entry_date|datefmt }}">ENTRY時点の形</a>
+    {% endif %}
+    {% if trade.exit_date %}
+    <a class="btn btn-sm" href="/holding-chart/{{ code }}.png?days={{ chart_days }}&as_of={{ trade.exit_date|datefmt }}">EXIT時点の形</a>
+    {% endif %}
+  </div>
+
+  <div class="detail-grid">
+    <div class="panel chart-panel">
+      <div class="chart-toolbar"><b>日足チャート（ENTRY価格・初期STOP・買ったときのレンジ・保有後最高値）</b></div>
+      {% if has_chart %}
+      <img src="/holding-chart/{{ code }}.png?days={{ chart_days }}" alt="{{ code }} 保有チャート">
+      {% else %}
+      <div class="chart-empty">株価データがないためチャートを表示できません。</div>
+      {% endif %}
+
+      <div class="panel-inner">
+        <h3>数値</h3>
+        <table class="kv-table">
+          <tr><th>現在値（{{ view.as_of|datefmt }}）</th><td>{{ view.close|yen }}</td>
+              <th>ENTRYからの損益率</th><td class="{% if view.pnl_pct is not none and view.pnl_pct < 0 %}neg{% elif view.pnl_pct %}pos{% endif %}">{{ view.pnl_pct|pct }}</td></tr>
+          <tr><th>初期STOP</th><td>{{ view.initial_stop|yen }}</td>
+              <th>STOPまでの距離</th><td>{{ view.distance_to_stop_pct|pct }}</td></tr>
+          <tr><th>元レンジ上限</th><td>{{ view.range_upper|yen }}</td>
+              <th>元レンジ下限</th><td>{{ view.range_lower|yen }}</td></tr>
+          <tr><th>上限に高値到達</th><td>{{ "済" if view.reached_range_upper else "まだ" }}</td>
+              <th>上限を終値で突破</th><td>{{ "済" if view.closed_above_range_upper else "まだ" }}</td></tr>
+          <tr><th>保有後最高値</th><td>{{ view.holding_high|yen }} {% if view.holding_high_date %}<span class="detail-sub">{{ view.holding_high_date|datefmt_md }}</span>{% endif %}</td>
+              <th>最高値からの位置</th><td>{{ view.drawdown_from_high_pct|pct }}</td></tr>
+          <tr><th>MA25</th><td>{{ view.ma25|yen }}（{{ view.ma_direction|dirlabel }}）</td>
+              <th>MA25との位置</th><td>{{ "上" if view.above_ma25 else ("下" if view.above_ma25 is false else "—") }}</td></tr>
+          <tr><th>直近陰線（前日以前）</th><td>{{ view.last_bearish_date|datefmt }}</td>
+              <th>その陰線の安値</th><td>{{ view.last_bearish_low|yen }} {% if view.below_last_bearish_low %}<span class="neg">割れ</span>{% endif %}</td></tr>
+          <tr><th>直近の局所安値</th><td>{{ view.recent_swing_low|yen }} {% if view.recent_swing_low_date %}<span class="detail-sub">{{ view.recent_swing_low_date|datefmt_md }}</span>{% endif %}</td>
+              <th>出来高</th><td>{{ view.volume|num }} {% if view.volume_vs_avg20 %}<span class="detail-sub">20日平均の{{ "%.1f"|format(view.volume_vs_avg20) }}倍</span>{% endif %}</td></tr>
+          <tr><th>保有日数（足）</th><td>{{ view.bars_held }}</td>
+              <th>買った理由</th><td>{{ trade.entry_reason or "—" }}</td></tr>
+          {% if trade.memo %}<tr><th>メモ</th><td colspan="3">{{ trade.memo }}</td></tr>{% endif %}
+          {% if not trade.is_open %}
+          <tr><th>EXIT</th><td>{{ trade.exit_date|datefmt }} {{ trade.exit_price|yen }}</td>
+              <th>EXIT理由</th><td>{{ trade.exit_reason or "—" }}{% if trade.exit_memo %} / {{ trade.exit_memo }}{% endif %}</td></tr>
+          {% endif %}
+        </table>
+        <p class="detail-sub">
+          初期STOPは最大損失を保証する価格ではありません。ギャップダウンでこれを下回って約定し得ます。
+        </p>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel reason-panel">
+        <h2>買った理由がまだ残っているか</h2>
+        <ul class="judgement-list">
+          {% for j in view.scenario %}
+          <li>
+            <span class="j-icon {{ 'ok' if j.ok == true else ('ng' if j.ok == false else 'na') }}">{{ '✓' if j.ok == true else ('✗' if j.ok == false else '–') }}</span>
+            <span class="j-label">{{ j.label }}</span>
+            <span class="j-detail">{{ j.detail }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+        <p class="detail-sub">
+          ここは <b>参考情報</b> です。✗ が付いても自動の売り条件にはなりません。
+        </p>
+      </div>
+
+      <div class="panel reason-panel" style="margin-top:14px;">
+        <h2>今日チャートを見るべき理由</h2>
+        {% if view.signs %}
+        <ul class="sign-list">
+          {% for s in view.signs %}
+          <li class="level-{{ s.level|lower }}">
+            <span class="badge level-{{ s.level|lower }}">{{ s.level }}</span>
+            <b>{{ s.label }}</b>
+            <div class="j-detail">{{ s.detail }}</div>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="detail-sub">目立った変化はありません。保有継続の判断は人間が行ってください。</p>
+        {% endif %}
+      </div>
+
+      <div class="panel reason-panel" style="margin-top:14px;">
+        <h2>ChatGPTへのコピペ用</h2>
+        <div class="explain-box">
+          <button type="button" class="btn btn-sm copy-btn" id="copy-btn">コピー</button>
+          <pre id="explain-text">{{ review_text }}</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="hint">
+    売却したら <code>swing sell {{ code }} --price 価格 --reason 理由</code> で記録してください。
+    ENTRY時点と EXIT時点のチャートPNGが <code>output/trades/</code> に保存されます。
+  </footer>
+</div>
+
+<script>
+document.getElementById('copy-btn').addEventListener('click', function () {
+  var text = document.getElementById('explain-text').textContent;
+  var btn = this;
+  function done() {
+    btn.textContent = 'コピーしました';
+    btn.classList.add('copied');
+    setTimeout(function () { btn.textContent = 'コピー'; btn.classList.remove('copied'); }, 1500);
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(done);
+  } else {
+    var ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta); done();
+  }
+});
+</script>
+{% endblock %}

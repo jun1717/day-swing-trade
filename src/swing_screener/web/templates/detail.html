@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}{{ result.stock.code }} {{ result.stock.name }} — 日足短期スイング スクリーナー{% endblock %}
+{% block body_class %}detail-page{% endblock %}
+{% block body %}
+
+<div class="page-header">
+  <h1><a href="/" style="color:inherit; text-decoration:none;">日足短期スイング スクリーナー</a></h1>
+  <div class="header-spacer"></div>
+  <a href="/" class="btn btn-sm">← 一覧へ戻る</a>
+</div>
+
+<div class="container">
+
+  <div class="detail-header">
+    <h1>{{ result.stock.code }} {{ result.stock.name }}</h1>
+    <span class="badge badge-{{ result.status|lower|replace('_candidate', '') }}">{{ result.status }}</span>
+    <span class="close-price">{{ result.latest_close|yen }}</span>
+    <span class="detail-sub">
+      {{ result.stock.sector }} ・ {{ row.theme_display }} ・ 優先度{{ row.priority }}{% if row.is_leader %} ・ 主力{% endif %} ・
+      {{ "ETF" if result.stock.asset_type == "etf" else "個別株" }}
+      {% if result.distance_to_lower_pct is not none %} ・ 下限まで {{ result.distance_to_lower_pct|pct }}{% endif %}
+    </span>
+  </div>
+
+  <div class="detail-nav">
+    {% if prev_code %}
+    <a class="btn btn-sm" href="/stock/{{ prev_code }}?days={{ chart_days }}">← 前の候補 ({{ prev_code }})</a>
+    {% else %}
+    <span class="btn btn-sm" style="opacity:.4; cursor:default;">← 前の候補</span>
+    {% endif %}
+
+    {% if position %}<span class="detail-sub">一覧の順位: {{ position }} / {{ total }} 件中</span>{% endif %}
+
+    {% if next_code %}
+    <a class="btn btn-sm" href="/stock/{{ next_code }}?days={{ chart_days }}">次の候補 ({{ next_code }}) →</a>
+    {% else %}
+    <span class="btn btn-sm" style="opacity:.4; cursor:default;">次の候補 →</span>
+    {% endif %}
+
+    <span class="spacer"></span>
+    <a class="btn btn-sm" href="/chart/{{ code }}.png?days={{ chart_days }}" download="{{ code }}_{{ chart_days }}d.png">⭳ チャートPNGをダウンロード</a>
+  </div>
+
+  <div class="detail-grid">
+    <div class="panel chart-panel">
+      <div class="chart-toolbar">
+        <b>日足チャート</b>
+        <span class="spacer"></span>
+        <div class="day-toggle">
+          {% for d in day_options %}
+          <a href="/stock/{{ code }}?days={{ d }}" class="{% if d == chart_days %}active{% endif %}">{{ d }}日</a>
+          {% endfor %}
+        </div>
+      </div>
+      {% if has_chart %}
+      <img src="/chart/{{ code }}.png?days={{ chart_days }}" alt="{{ code }} 日足チャート">
+      {% else %}
+      <div class="chart-empty">株価データがないためチャートを表示できません。</div>
+      {% endif %}
+    </div>
+
+    <div>
+      <div class="panel reason-panel">
+        <h2>判定理由（ChatGPTへのコピペ用）</h2>
+        <div class="explain-box">
+          <button type="button" class="btn btn-sm copy-btn" id="copy-btn">コピー</button>
+          <pre id="explain-text">{{ explain_text }}</pre>
+        </div>
+      </div>
+
+      <div class="panel reason-panel" style="margin-top:14px;">
+        <h2>判定内訳（一覧性重視）</h2>
+        {% for group_name, judgements in judgement_groups %}
+        <div class="judgement-group">
+          <h3>{{ group_name }}</h3>
+          <ul class="judgement-list">
+            {% for j in judgements %}
+            <li>
+              <span class="j-icon {{ 'ok' if j.ok == true else ('ng' if j.ok == false else 'na') }}">{{ '✓' if j.ok == true else ('✗' if j.ok == false else '–') }}</span>
+              <span class="j-label">{{ j.label }}{% if j.required %}<span class="j-required">必須</span>{% endif %}</span>
+              <span class="j-detail">{{ j.detail }}</span>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% else %}
+        <p class="detail-sub">判定情報がありません。</p>
+        {% endfor %}
+        <div class="status-line {{ result.status|lower }}">
+          状態: {{ result.status }}
+          {% if result.stop_price %} ／ 損切り候補: {{ result.stop_price|yen }}{% endif %}
+        </div>
+        {% if result.out_reason %}
+        <p class="detail-sub" style="margin-top:8px;">落選理由: {{ result.out_reason }}</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <footer class="hint">
+    このツールは買い銘柄を自動決定しません。チャートと判定理由を確認したうえで、最終判断は必ず人間が行ってください。
+  </footer>
+</div>
+
+<script>
+document.getElementById('copy-btn').addEventListener('click', function () {
+  var text = document.getElementById('explain-text').textContent;
+  var btn = this;
+  function done() {
+    var original = 'コピー';
+    btn.textContent = 'コピーしました';
+    btn.classList.add('copied');
+    setTimeout(function () { btn.textContent = original; btn.classList.remove('copied'); }, 1500);
+  }
+  function fallbackCopy(t, cb) {
+    var ta = document.createElement('textarea');
+    ta.value = t;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (e) { /* noop */ }
+    document.body.removeChild(ta);
+    cb();
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(function () { fallbackCopy(text, done); });
+  } else {
+    fallbackCopy(text, done);
+  }
+});
+</script>
+{% endblock %}

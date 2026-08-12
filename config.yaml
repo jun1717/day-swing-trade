@@ -1,0 +1,52 @@
+# =============================================================
+# config.yaml  —  確定済みルールのみ
+#
+# ここに書かれた値は CODEX_HANDOFF.md で「確定」とされた売買ルール。
+# 未確定の数値・アルゴリズムは experimental.yaml に置くこと。
+# =============================================================
+
+universe:
+  watchlist_csv: data/watchlist.csv
+  stocks_csv: data/stocks.csv
+  stock_themes_csv: data/stock_themes.csv
+  # asset_type を code 単位で強制上書きする（自動判定が誤る場合のみ使う）
+  # 例:  "200A": etf
+  asset_type_overrides: {}
+
+# 株価フィルター（CODEX_HANDOFF §9）
+# 銘柄マスターからは削除せず、毎日のスクリーニング時に売買候補を絞る条件。
+price_filter:
+  min: 2000
+  max: 7000
+
+# 移動平均（CODEX_HANDOFF §28）
+ma:
+  period: 25
+
+# 短期レンジ（CODEX_HANDOFF §12, §28）
+range:
+  min_days: 3
+  max_days: 10
+  min_lower_touches: 2
+
+# 損切りライン（CODEX_HANDOFF §20）: レンジ下限の 0.5% 下
+stop:
+  buffer_pct: 0.005
+
+# --- 以下はルールではなく実行環境の設定 ---
+
+data:
+  provider: yfinance
+  suffix: ".T"
+  cache_dir: cache/prices
+  fetch_period: "1y"      # yfinance の period
+  min_bars: 60            # これ未満の銘柄は判定不能として OUT
+  sleep_sec: 0.3          # 取得間隔（API負荷対策）
+
+output:
+  dir: output
+  chart_dir: output/charts
+
+chart:
+  default_days: 120
+  day_options: [60, 120, 250]

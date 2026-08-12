@@ -1,0 +1,7 @@
+# 注記: reference_high の決め方だけを 5 案で比較した検証であり、収益バックテストではない。 WARNING 開始条件は VARIANT A、warning_low 割れ後は CLOSE_BREAK（仮想EXITは翌営業日始値）に固定した研究上の基準であって、いずれも正式ルールではない。 ENTRY ロジック / max_position_in_range=0.65 / initial_stop = range_lower*0.995 / warning_low の定義 / 押し安値の取り方 / trail = 押し安値*0.995 / STOP を下げないこと は5 案で完全に同一。新しい%閾値は追加していない。 同日成立の扱い（REHIGH 優先 / EXIT 優先）を逆にしたときの差分（§7）。どちらが正しい順序かは決めていない。
+rh_rule,rh_rule_label,ambiguous_days,events_affected,events_changed,rehigh_first_median_return,exit_first_median_return,note
+HOLDING_HIGH,RH-A 保有中最高値,3,3,3,-2.69%,-2.69%,どちらが正しい順序かは決めていない。両方走らせた結果を並べただけ
+WARNING_HIGH,RH-B 警戒足高値,3,3,3,-2.42%,-2.42%,どちらが正しい順序かは決めていない。両方走らせた結果を並べただけ
+PRE_WARNING_CLOSE_HIGH,RH-C 前日までの終値高値,5,5,5,-2.69%,-2.59%,どちらが正しい順序かは決めていない。両方走らせた結果を並べただけ
+WARNING_OPEN,RH-D 警戒足始値,5,5,5,-2.54%,-2.42%,どちらが正しい順序かは決めていない。両方走らせた結果を並べただけ
+PRE_WARNING_HIGH,RH-E 前日までの高値,4,4,4,-2.69%,-2.69%,どちらが正しい順序かは決めていない。両方走らせた結果を並べただけ

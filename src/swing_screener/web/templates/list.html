@@ -1,0 +1,270 @@
+{% extends "base.html" %}
+{% block title %}一覧 — 日足短期スイング スクリーナー{% endblock %}
+{% block body_class %}list-page{% endblock %}
+{% block body %}
+
+<div class="page-header">
+  <h1>日足短期スイング スクリーナー</h1>
+  <div class="header-meta">
+    <span>データ基準日: <b>{{ as_of|datefmt }}</b></span>
+    <span>銘柄数: <b>{{ total }}</b></span>
+    <span>株価取得: <b>{{ last_fetch_at or "—" }}</b></span>
+    <span>算出: <b>{{ generated_at or "—" }}</b></span>
+  </div>
+  <div class="header-spacer"></div>
+  <div class="status-badges">
+    {% for s in status_order %}
+    <button type="button" class="count-badge {{ s|lower }}" data-status-toggle="{{ s }}" title="{{ s }} のみ表示">
+      {{ s }} <span class="n">{{ counts.get(s, 0) }}</span>
+    </button>
+    {% endfor %}
+  </div>
+  <form method="post" action="/rescan" id="rescan-form">
+    <button type="submit" class="btn btn-primary" id="rescan-btn" title="キャッシュ済み株価から再計算します（ネットワークには触れません）">↻ 再スクリーニング</button>
+  </form>
+</div>
+
+<div class="container">
+
+  {% if warnings %}
+  <div class="warning-box">
+    <b>警告 ({{ warnings|length }}件)</b>
+    <ul style="margin:6px 0 0 18px; padding:0;">
+      {% for w in warnings %}<li>{{ w }}</li>{% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <div class="priority-filter-bar">
+    <button type="button" class="btn-priority" id="btn-priority-filter">★ NEAR + ENTRY_CANDIDATE のみ表示</button>
+    <span class="priority-filter-note">これが毎日の主用途です。<b>レンジ下限付近まで来ている銘柄</b>と<b>反発確認済みの銘柄</b>だけに絞り込みます。</span>
+    <button type="button" class="btn btn-sm" id="btn-clear-filter" style="margin-left:auto;">フィルタ解除</button>
+  </div>
+
+  <div class="filter-bar">
+    <div class="filter-group">
+      <label class="group-label">状態</label>
+      <div class="filter-checks" id="status-filter">
+        {% for s in status_order %}
+        <label><input type="checkbox" value="{{ s }}" class="f-status" checked> {{ s }}</label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <label class="group-label">業種</label>
+      <select id="f-sector">
+        <option value="">すべて</option>
+        {% for sec in sectors %}<option value="{{ sec }}">{{ sec }}</option>{% endfor %}
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label class="group-label">テーマ</label>
+      <select id="f-theme">
+        <option value="">すべて</option>
+        {% for th in themes %}<option value="{{ th }}">{{ th }}</option>{% endfor %}
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label class="group-label">優先度</label>
+      <select id="f-priority">
+        <option value="">すべて</option>
+        <option value="A">A</option>
+        <option value="B">B</option>
+        <option value="C">C</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label class="group-label">主力</label>
+      <div class="filter-checks">
+        <label><input type="checkbox" id="f-leader"> 主力銘柄のみ</label>
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <label class="group-label">銘柄種別</label>
+      <select id="f-asset-type">
+        <option value="">すべて</option>
+        <option value="stock">個別株のみ</option>
+        <option value="etf">ETFのみ</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label class="group-label">検索</label>
+      <input type="text" id="f-search" placeholder="コード・銘柄名">
+    </div>
+
+    <div class="filter-group">
+      <label class="group-label">OUT銘柄</label>
+      <div class="filter-checks">
+        <label><input type="checkbox" id="f-show-out"> 表示する（落選理由付き）</label>
+      </div>
+    </div>
+  </div>
+
+  <div class="result-count" id="result-count"></div>
+
+  <div class="table-scroll">
+    <table class="stock-table" id="stock-table">
+      <thead>
+        <tr>
+          {% for key, label, kind in table_columns %}
+          <th data-key="{{ key }}" class="{% if key == 'out_reason' %}col-outreason{% endif %}">{{ label }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr
+          class="row-status-{{ row.status|lower }}{% if row.status == 'OUT' %} row-out{% endif %}"
+          data-status="{{ row.status }}"
+          data-sector="{{ row.sector }}"
+          data-theme="{{ row.theme_filter }}"
+          data-priority="{{ row.priority }}"
+          data-leader="{{ '1' if row.is_leader else '0' }}"
+          data-asset-type="{{ row.asset_type }}"
+          data-search="{{ row.search_text }}"
+          data-href="/stock/{{ row.code }}"
+        >
+          {% for cell in row.cells %}
+          <td class="col-{{ cell.key }}{% if cell.key == 'out_reason' %} col-outreason{% endif %}" data-sort="{{ cell.sort }}">{% if cell.safe %}{{ cell.text|safe }}{% else %}{{ cell.text }}{% endif %}</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <footer class="hint">
+    行クリックで詳細画面へ。列見出しクリックでソート。フィルタ・ソートはすべてブラウザ内で完結し、サーバーには問い合わせません。
+  </footer>
+</div>
+
+<script>
+(function () {
+  var table = document.getElementById('stock-table');
+  var tbody = table.tBodies[0];
+  var allRows = Array.prototype.slice.call(tbody.rows);
+
+  var state = {
+    statuses: new Set(Array.prototype.slice.call(document.querySelectorAll('.f-status')).map(function (cb) { return cb.value; })),
+    sector: '', theme: '', priority: '', leaderOnly: false, assetType: '', search: '', showOut: false
+  };
+
+  function applyFilters() {
+    var visibleCount = 0;
+    allRows.forEach(function (tr) {
+      var ok = true;
+      var status = tr.dataset.status;
+      if (!state.statuses.has(status)) ok = false;
+      if (ok && status === 'OUT' && !state.showOut) ok = false;
+      if (ok && state.sector && tr.dataset.sector !== state.sector) ok = false;
+      if (ok && state.theme && tr.dataset.theme.indexOf('|' + state.theme + '|') === -1) ok = false;
+      if (ok && state.priority && tr.dataset.priority !== state.priority) ok = false;
+      if (ok && state.leaderOnly && tr.dataset.leader !== '1') ok = false;
+      if (ok && state.assetType && tr.dataset.assetType !== state.assetType) ok = false;
+      if (ok && state.search && tr.dataset.search.indexOf(state.search) === -1) ok = false;
+      tr.classList.toggle('row-hidden', !ok);
+      if (ok) visibleCount++;
+    });
+    document.getElementById('result-count').textContent = visibleCount + ' 件表示 / 全 ' + allRows.length + ' 件';
+    document.body.classList.toggle('show-out-reason', state.showOut);
+  }
+
+  document.querySelectorAll('.f-status').forEach(function (cb) {
+    cb.addEventListener('change', function () {
+      state.statuses = new Set(Array.prototype.slice.call(document.querySelectorAll('.f-status:checked')).map(function (c) { return c.value; }));
+      document.getElementById('btn-priority-filter').classList.remove('active');
+      applyFilters();
+    });
+  });
+  document.getElementById('f-sector').addEventListener('change', function (e) { state.sector = e.target.value; applyFilters(); });
+  document.getElementById('f-theme').addEventListener('change', function (e) { state.theme = e.target.value; applyFilters(); });
+  document.getElementById('f-priority').addEventListener('change', function (e) { state.priority = e.target.value; applyFilters(); });
+  document.getElementById('f-leader').addEventListener('change', function (e) { state.leaderOnly = e.target.checked; applyFilters(); });
+  document.getElementById('f-asset-type').addEventListener('change', function (e) { state.assetType = e.target.value; applyFilters(); });
+  document.getElementById('f-search').addEventListener('input', function (e) { state.search = e.target.value.trim().toLowerCase(); applyFilters(); });
+  document.getElementById('f-show-out').addEventListener('change', function (e) { state.showOut = e.target.checked; applyFilters(); });
+
+  document.querySelectorAll('.count-badge').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var s = btn.dataset.statusToggle;
+      document.querySelectorAll('.f-status').forEach(function (cb) { cb.checked = (cb.value === s); });
+      state.statuses = new Set([s]);
+      if (s === 'OUT') {
+        document.getElementById('f-show-out').checked = true;
+        state.showOut = true;
+      }
+      document.getElementById('btn-priority-filter').classList.remove('active');
+      applyFilters();
+    });
+  });
+
+  document.getElementById('btn-priority-filter').addEventListener('click', function () {
+    document.querySelectorAll('.f-status').forEach(function (cb) { cb.checked = (cb.value === 'NEAR' || cb.value === 'ENTRY_CANDIDATE'); });
+    state.statuses = new Set(['NEAR', 'ENTRY_CANDIDATE']);
+    document.getElementById('f-show-out').checked = false;
+    state.showOut = false;
+    this.classList.add('active');
+    applyFilters();
+  });
+
+  document.getElementById('btn-clear-filter').addEventListener('click', function () {
+    document.querySelectorAll('.f-status').forEach(function (cb) { cb.checked = true; });
+    state.statuses = new Set(Array.prototype.slice.call(document.querySelectorAll('.f-status')).map(function (c) { return c.value; }));
+    document.getElementById('f-sector').value = ''; state.sector = '';
+    document.getElementById('f-theme').value = ''; state.theme = '';
+    document.getElementById('f-priority').value = ''; state.priority = '';
+    document.getElementById('f-leader').checked = false; state.leaderOnly = false;
+    document.getElementById('f-asset-type').value = ''; state.assetType = '';
+    document.getElementById('f-search').value = ''; state.search = '';
+    document.getElementById('f-show-out').checked = false; state.showOut = false;
+    document.getElementById('btn-priority-filter').classList.remove('active');
+    applyFilters();
+  });
+
+  // 行クリックで詳細画面へ（リンク自体のクリックは既定動作に任せる）
+  tbody.addEventListener('click', function (e) {
+    if (e.target.closest('a')) return;
+    var tr = e.target.closest('tr');
+    if (tr && tr.dataset.href) window.location.href = tr.dataset.href;
+  });
+
+  // 列ソート（サーバー往復なし。data-sort 属性の値で比較する）
+  var sortState = { index: null, dir: 'asc' };
+  function cmpValues(a, b) {
+    var numLike = /^-?\d+(\.\d+)?$/;
+    if (numLike.test(a) && numLike.test(b)) return parseFloat(a) - parseFloat(b);
+    return a.localeCompare(b, 'ja');
+  }
+  table.querySelectorAll('thead th').forEach(function (th, index) {
+    th.addEventListener('click', function () {
+      var dir = (sortState.index === index && sortState.dir === 'asc') ? 'desc' : 'asc';
+      sortState = { index: index, dir: dir };
+      var rows = Array.prototype.slice.call(tbody.rows);
+      rows.sort(function (ra, rb) {
+        var va = ra.cells[index].dataset.sort || '';
+        var vb = rb.cells[index].dataset.sort || '';
+        var res = cmpValues(va, vb);
+        return dir === 'asc' ? res : -res;
+      });
+      rows.forEach(function (r) { tbody.appendChild(r); });
+      table.querySelectorAll('thead th').forEach(function (h) { h.classList.remove('sort-asc', 'sort-desc'); });
+      th.classList.add(dir === 'asc' ? 'sort-asc' : 'sort-desc');
+    });
+  });
+
+  document.getElementById('rescan-form').addEventListener('submit', function () {
+    var btn = document.getElementById('rescan-btn');
+    btn.disabled = true;
+    btn.textContent = '再計算中...';
+  });
+
+  applyFilters();
+})();
+</script>
+{% endblock %}

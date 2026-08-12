@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}ENTRY候補履歴 — 日足短期スイング スクリーナー{% endblock %}
+{% block body_class %}list-page{% endblock %}
+{% block body %}
+
+<div class="page-header">
+  <h1>ENTRY候補履歴</h1>
+  <div class="header-meta">
+    <span>履歴: <b>{{ rows|length }}</b>件</span>
+    <span>日次スナップショット: <b>{{ snapshot_dates|length }}</b>日分</span>
+    {% if snapshot_dates %}<span>{{ snapshot_dates[0]|datefmt }} 〜 {{ snapshot_dates[-1]|datefmt }}</span>{% endif %}
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="notice-box">
+    ENTRY_CANDIDATE が出た日を、<b>実際に買わなかったものも含めて</b>すべて残しています。
+    これがフォワード検証の母数になります。<br>
+    この履歴は <b>あとから書き換えません</b>。株価は配当調整で遡って変わり、レンジ検出も
+    新しい足が付くたびに動くため、後日の再計算値で上書きすると「その日に見えていたもの」が
+    失われるからです。
+  </div>
+
+  {% if not rows %}
+  <div class="empty-box">
+    まだ ENTRY候補の記録がありません。<code>swing daily</code> を実行すると、
+    その日の ENTRY_CANDIDATE が <code>{{ signals_path }}</code> へ追記されます。
+  </div>
+  {% else %}
+  <div class="table-scroll">
+    <table class="stock-table">
+      <thead>
+        <tr>
+          <th>シグナル日</th><th>コード</th><th>銘柄名</th><th>購入</th>
+          <th>シグナル日終値</th><th>レンジ下限</th><th>レンジ上限</th><th>レンジ内位置</th>
+          <th>下限まで</th><th>下限反応</th><th>前日高値</th><th>初期STOP</th><th>理由</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>{{ r.signal_date }}</td>
+          <td><a href="/stock/{{ r.code }}">{{ r.code }}</a></td>
+          <td>{{ r.name }}</td>
+          <td>{% if r.purchased %}<a href="/holdings/{{ r.code }}"><span class="badge badge-entry_candidate">購入</span></a>{% else %}<span class="detail-sub">見送り</span>{% endif %}</td>
+          <td>{{ r.signal_close }}</td>
+          <td>{{ r.range_lower }}</td>
+          <td>{{ r.range_upper }}</td>
+          <td>{{ r.range_position }}</td>
+          <td>{{ r.distance_to_lower_pct }}</td>
+          <td>{{ r.lower_touch_count }}</td>
+          <td>{{ r.prev_high }}</td>
+          <td>{{ r.initial_stop }}</td>
+          <td class="col-outreason-always">{{ r.signal_reason }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <footer class="hint">
+    ENTRY候補履歴: <code>{{ signals_path }}</code><br>
+    日次スナップショット: <code>{{ daily_dir }}/YYYY-MM-DD.csv</code>（その日の全銘柄の判定）<br>
+    フォワード検証用の素データ書き出し: <code>swing forward-export</code>
+  </footer>
+</div>
+{% endblock %}

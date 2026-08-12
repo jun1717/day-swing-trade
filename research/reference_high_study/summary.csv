@@ -1,0 +1,7 @@
+# 注記: reference_high の決め方だけを 5 案で比較した検証であり、収益バックテストではない。 WARNING 開始条件は VARIANT A、warning_low 割れ後は CLOSE_BREAK（仮想EXITは翌営業日始値）に固定した研究上の基準であって、いずれも正式ルールではない。 ENTRY ロジック / max_position_in_range=0.65 / initial_stop = range_lower*0.995 / warning_low の定義 / 押し安値の取り方 / trail = 押し安値*0.995 / STOP を下げないこと は5 案で完全に同一。新しい%閾値は追加していない。
+rh_rule,rh_rule_label,rh_condition,events,entered,warnings,rehigh_confirmed,rehigh_rate,median_days_to_rehigh,stop_raised_events,stop_raise_total,stop_above_entry_events,trail_stop_exits,break_exits,initial_stop_exits,stuck_in_warning,median_return_pct,median_available_max_gain_pct,median_giveback_pct,ambiguous_same_day_warnings
+HOLDING_HIGH,RH-A HOLDING_HIGH（警戒足発生時点までの保有中最高値。現行）,max(high) ENTRY〜警戒足当日,32,32,26,7,7/26 (27%),1.0 日,6,6,5,5,13,14,5,-2.6945,10.0998,12.6470,3
+WARNING_HIGH,RH-B WARNING_HIGH（警戒陰線自身の高値）,warning_high,32,32,27,10,10/27 (37%),1.0 日,9,9,5,7,11,14,6,-2.4202,10.0998,12.1446,3
+PRE_WARNING_CLOSE_HIGH,RH-C PRE_WARNING_CLOSE_HIGH（警戒足前日までの終値ベース最高値）,max(close) ENTRY〜警戒足前日,32,32,27,11,11/27 (41%),1.0 日,8,10,6,8,10,14,6,-2.6945,10.0998,12.4688,5
+WARNING_OPEN,RH-D WARNING_OPEN（警戒陰線の始値）,warning_open,32,32,29,14,14/29 (48%),1.0 日,11,13,6,11,8,13,5,-2.5441,10.0998,12.4688,5
+PRE_WARNING_HIGH,RH-E PRE_WARNING_HIGH（警戒足前日までの高値ベース最高値。参考）,max(high) ENTRY〜警戒足前日,32,32,26,8,8/26 (31%),1.0 日,6,7,5,6,12,14,5,-2.6945,10.0998,12.6470,4

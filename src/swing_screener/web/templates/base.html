@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}日足短期スイング スクリーナー{% endblock %}</title>
+<link rel="stylesheet" href="/static/style.css">
+{% block head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+<nav class="app-nav">
+  <a href="/" class="{% if nav == 'list' or not nav %}active{% endif %}">候補一覧</a>
+  <a href="/holdings" class="{% if nav == 'holdings' %}active{% endif %}">保有銘柄</a>
+  <a href="/signals" class="{% if nav == 'signals' %}active{% endif %}">ENTRY候補履歴</a>
+  <span class="app-nav-note">売買判定はしません。最終判断は日足チャートを見て人間が行います。</span>
+</nav>
+{% block body %}{% endblock %}
+</body>
+</html>

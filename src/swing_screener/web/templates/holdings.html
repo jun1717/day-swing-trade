@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}保有銘柄 — 日足短期スイング スクリーナー{% endblock %}
+{% block body_class %}list-page{% endblock %}
+{% block body %}
+
+<div class="page-header">
+  <h1>保有銘柄</h1>
+  <div class="header-meta">
+    <span>データ基準日: <b>{{ as_of|datefmt }}</b></span>
+    <span>保有: <b>{{ views|length }}</b>件</span>
+    <span>決済済み: <b>{{ closed|length }}</b>件</span>
+  </div>
+  <div class="header-spacer"></div>
+  <div class="status-badges">
+    {% for lv in level_order %}
+    <span class="count-badge level-{{ lv|lower }}">{{ lv }} <span class="n">{{ levels.get(lv, 0) }}</span></span>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="notice-box">
+    <b>この画面は「売れ」と言いません。</b>
+    出しているのは <b>今日チャートを見るべき理由</b> だけです。
+    警戒陰線・押し安値・trail stop の機械判定は v1 では採用していません
+    （理由は <code>RESEARCH_SUMMARY.md</code>）。EXIT は日足を見て人間が決めてください。
+  </div>
+
+  {% if not views %}
+  <div class="empty-box">
+    保有銘柄の登録がありません。<br>
+    ターミナルで <code>swing buy 9513 --price 3800 --qty 100</code> のように記録するか、
+    <code>{{ trades_path }}</code> を直接編集してください。
+  </div>
+  {% else %}
+
+  <div class="table-scroll">
+    <table class="stock-table holdings-table">
+      <thead>
+        <tr>
+          <th>コード</th>
+          <th>銘柄名</th>
+          <th>見るべき理由</th>
+          <th>ENTRY日</th>
+          <th>ENTRY価格</th>
+          <th>株数</th>
+          <th>現在値</th>
+          <th>損益率</th>
+          <th>損益額</th>
+          <th>初期STOP</th>
+          <th>STOPまで</th>
+          <th>元レンジ上限</th>
+          <th>上限到達</th>
+          <th>終値突破</th>
+          <th>保有後最高値</th>
+          <th>高値比</th>
+          <th>MA25</th>
+          <th>直近陰線安値<br><span class="detail-sub">前日以前</span></th>
+          <th>直近の局所安値</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for v in views %}
+        <tr class="level-row-{{ v.level|lower }}" data-href="/holdings/{{ v.trade.code }}">
+          <td><a href="/holdings/{{ v.trade.code }}">{{ v.trade.code }}</a></td>
+          <td>{{ v.trade.name or "—" }}</td>
+          <td><span class="badge level-{{ v.level|lower }}">{{ v.level }}</span>
+            {% if v.signs %}<span class="sign-inline">{{ v.signs|map(attribute='label')|join(' / ') }}</span>{% endif %}
+          </td>
+          <td>{{ v.trade.entry_date|datefmt }}</td>
+          <td>{{ v.trade.entry_price|yen }}</td>
+          <td>{{ v.trade.quantity|num }}</td>
+          <td>{{ v.close|yen }}</td>
+          <td class="{% if v.pnl_pct is not none and v.pnl_pct < 0 %}neg{% elif v.pnl_pct %}pos{% endif %}">{{ v.pnl_pct|pct }}</td>
+          <td class="{% if v.pnl_yen is not none and v.pnl_yen < 0 %}neg{% elif v.pnl_yen %}pos{% endif %}">{{ v.pnl_yen|num }}</td>
+          <td>{{ v.initial_stop|yen }}</td>
+          <td>{{ v.distance_to_stop_pct|pct }}</td>
+          <td>{{ v.range_upper|yen }}</td>
+          <td>{{ "済" if v.reached_range_upper else "—" }}</td>
+          <td>{{ "済" if v.closed_above_range_upper else "—" }}</td>
+          <td>{{ v.holding_high|yen }}</td>
+          <td>{{ v.drawdown_from_high_pct|pct }}</td>
+          <td>{{ v.ma25|yen }}</td>
+          <td>{{ v.last_bearish_low|yen }}</td>
+          <td>{{ v.recent_swing_low|yen }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% if closed %}
+  <h2 class="section-title">決済済み（{{ closed|length }}件）</h2>
+  <div class="table-scroll">
+    <table class="stock-table">
+      <thead>
+        <tr>
+          <th>コード</th><th>銘柄名</th><th>ENTRY日</th><th>ENTRY価格</th>
+          <th>EXIT日</th><th>EXIT価格</th><th>損益率</th><th>損益額</th>
+          <th>保有日数</th><th>EXIT理由</th><th>メモ</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in closed %}
+        <tr data-href="/holdings/{{ t.code }}">
+          <td><a href="/holdings/{{ t.code }}">{{ t.code }}</a></td>
+          <td>{{ t.name or "—" }}</td>
+          <td>{{ t.entry_date|datefmt }}</td>
+          <td>{{ t.entry_price|yen }}</td>
+          <td>{{ t.exit_date|datefmt }}</td>
+          <td>{{ t.exit_price|yen }}</td>
+          <td class="{% if t.realized_pnl_pct is not none and t.realized_pnl_pct < 0 %}neg{% elif t.realized_pnl_pct %}pos{% endif %}">{{ t.realized_pnl_pct|pct }}</td>
+          <td>{{ t.realized_pnl_yen|num }}</td>
+          <td>{{ t.holding_days|num }}</td>
+          <td>{{ t.exit_reason or "—" }}</td>
+          <td>{{ t.exit_memo or "—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <footer class="hint">
+    台帳: <code>{{ trades_path }}</code>（CSV。直接編集しても次のリクエストで反映されます）<br>
+    記録コマンド: <code>swing buy CODE --price P --qty N</code> / <code>swing sell CODE --price P --reason R</code>
+  </footer>
+</div>
+
+<script>
+document.querySelectorAll('tr[data-href]').forEach(function (tr) {
+  tr.addEventListener('click', function (e) {
+    if (e.target.closest('a')) return;
+    window.location.href = tr.dataset.href;
+  });
+});
+</script>
+{% endblock %}

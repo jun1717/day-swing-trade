@@ -1,0 +1,7 @@
+# 注記: reference_high の決め方だけを 5 案で比較した検証であり、収益バックテストではない。 WARNING 開始条件は VARIANT A、warning_low 割れ後は CLOSE_BREAK（仮想EXITは翌営業日始値）に固定した研究上の基準であって、いずれも正式ルールではない。 ENTRY ロジック / max_position_in_range=0.65 / initial_stop = range_lower*0.995 / warning_low の定義 / 押し安値の取り方 / trail = 押し安値*0.995 / STOP を下げないこと は5 案で完全に同一。新しい%閾値は追加していない。 既存 fractal との参考比較（§19）。成績競争ではなく、押し安値の確定タイミングが自然かどうかを見るためのもの。
+rh_rule,rh_rule_label,ours_confirmed,both_recognized,ours_only,fractal_only,ours_first,same_day,fractal_first,median_lead_days,note
+HOLDING_HIGH,RH-A 保有中最高値,7,1,6,6,0,0,1,-1.0 日,成績競争ではなく、確定タイミングが自然かどうかの参考比較（§19）
+WARNING_HIGH,RH-B 警戒足高値,10,2,8,5,2,0,0,1.0 日,成績競争ではなく、確定タイミングが自然かどうかの参考比較（§19）
+PRE_WARNING_CLOSE_HIGH,RH-C 前日までの終値高値,11,2,9,4,1,0,1,0.0 日,成績競争ではなく、確定タイミングが自然かどうかの参考比較（§19）
+WARNING_OPEN,RH-D 警戒足始値,14,2,12,4,2,0,0,1.0 日,成績競争ではなく、確定タイミングが自然かどうかの参考比較（§19）
+PRE_WARNING_HIGH,RH-E 前日までの高値,8,1,7,6,0,0,1,-1.0 日,成績競争ではなく、確定タイミングが自然かどうかの参考比較（§19）

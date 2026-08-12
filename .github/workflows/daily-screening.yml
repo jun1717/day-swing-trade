@@ -1,0 +1,191 @@
+# 平日の引け後に「その日の候補銘柄」を ChatGPT 用の市場データとして自動生成する。
+#
+#   swing fetch           株価取得（ネットワークに触れるのはここだけ）
+#   swing daily           本番スクリーニング + 日次スナップショット + ENTRY候補履歴
+#   swing chatgpt-export  output/chatgpt/YYYY-MM-DD/ へ ChatGPT 分析用CSV
+#
+# このワークフローは売買判定を一切変更しない。やるのは「本番スクリーニングの
+# 結果を CSV にして artifact へ置く」ことだけで、買う / まだ待つ / 見送るの
+# 判断は人間が日足を見て行う。チャート画像は生成しない（入力はテキストのみ）。
+#
+# 手入力データである data/trades.csv には触れない（下の検査ステップで固定）。
+
+name: daily-screening
+
+on:
+  schedule:
+    # 16:10 JST = 07:10 UTC（JST は UTC+9 固定でサマータイムがない）。
+    # 日本の祝日は **ここに書かない**。市場休日カレンダーを cron へ焼き込むと
+    # 毎年壊れるため、平日は毎日起動し、祝日かどうかは「新しい営業日の株価が
+    # 来ているか」（market-check）で判定する。
+    - cron: "10 7 * * 1-5"
+  workflow_dispatch:
+
+# 定期実行と手動実行が重なっても、同じ日次データを同時に更新しない。
+# 走行中のものは殺さず、後発を待たせる（途中で止めると journal が中途半端になる）。
+concurrency:
+  group: daily-screening
+  cancel-in-progress: false
+
+# 必要最小限。生成データ用ブランチへ push するためだけに contents: write を付ける。
+# 新しい Secret は要らない（GITHUB_TOKEN は自動で発行される）。
+permissions:
+  contents: write
+
+env:
+  # 自動生成物の置き場所。default branch を日次 commit で汚さないための専用ブランチ。
+  DATA_BRANCH: automation-data
+
+jobs:
+  screen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      # 前回までの journal / signals / bundle を作業ディレクトリへ戻す。
+      # runner は使い捨てなので、これをやらないとフォワード記録が毎日消える。
+      - name: Restore generated data from data branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          work="${RUNNER_TEMP}/data-branch"
+          rm -rf "$work"
+          if git ls-remote --exit-code --heads origin "$DATA_BRANCH" >/dev/null 2>&1; then
+            git clone --quiet --depth 1 --branch "$DATA_BRANCH" --single-branch \
+              "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$work"
+            mkdir -p data output
+            if [ -d "$work/data/journal" ]; then
+              cp -R "$work/data/journal" data/
+              echo "restored data/journal"
+            fi
+            if [ -d "$work/output/chatgpt" ]; then
+              cp -R "$work/output/chatgpt" output/
+              echo "restored output/chatgpt"
+            fi
+          else
+            echo "$DATA_BRANCH はまだない（初回実行）。空の状態から始める。"
+          fi
+
+      - name: Fetch prices
+        run: swing fetch
+
+      # 祝日・市場休日の判定。祝日は fetch が成功しても株価の日付が進まないので
+      # has_new_data=false になり、以降のステップを丸ごと飛ばして正常終了する。
+      # fetch 自体が失敗した場合は上のステップで既に workflow が落ちている
+      # （休日扱いにはしない）。取得が全滅して株価キャッシュが空になった場合も
+      # market-check が失敗するので、休日として静かに成功することはない。
+      - name: Check for new market data
+        id: market
+        run: python -m swing_screener.cli market-check --format github >> "$GITHUB_OUTPUT"
+
+      - name: No new market data
+        if: steps.market.outputs.has_new_data != 'true'
+        run: |
+          echo "No new market data (市場休日または株価未更新)"
+          echo "  株価キャッシュの最新日: ${{ steps.market.outputs.market_date }}"
+          echo "  前回書き出した bundle:  ${{ steps.market.outputs.last_export_date }}"
+          echo "新しい bundle は作らず、前回の bundle も上書きしない。"
+
+      - name: Screen and record (daily)
+        if: steps.market.outputs.has_new_data == 'true'
+        run: swing daily
+
+      - name: Export ChatGPT market data
+        if: steps.market.outputs.has_new_data == 'true'
+        run: swing chatgpt-export --skip-existing
+
+      # export の中でも検査しているが、artifact へ上げる直前にもう一度回す。
+      # 中途半端な CSV を「その日の正常な最新データ」として残さないため。
+      - name: Validate exported CSV
+        if: steps.market.outputs.has_new_data == 'true'
+        run: swing chatgpt-validate
+
+      # 実際に売買した記録は手入力データ。自動処理と混ざると
+      # 「表示の記録」なのか「行動の記録」なのか分からなくなる。
+      - name: Ensure trades.csv was not touched
+        if: steps.market.outputs.has_new_data == 'true'
+        run: |
+          set -euo pipefail
+          if [ -n "$(git status --porcelain -- data/trades.csv)" ]; then
+            echo "::error::data/trades.csv が自動処理で変更された（手入力データなので許可しない）"
+            git status --porcelain -- data/trades.csv
+            exit 1
+          fi
+          echo "data/trades.csv は変更されていない"
+
+      - name: Upload ChatGPT market data
+        if: steps.market.outputs.has_new_data == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatgpt-market-data-${{ steps.market.outputs.market_date }}
+          path: output/chatgpt/${{ steps.market.outputs.market_date }}/
+          if-no-files-found: error
+          retention-days: 90
+
+      # artifact には保持期限があるので、永続記録はブランチ側にも残す。
+      # 保存するのは自動生成物だけ（trades.csv は入れない）。既存ファイルを
+      # 消さずに上書きコピーするので、過去のスナップショットは失われない。
+      - name: Persist generated data to data branch
+        if: steps.market.outputs.has_new_data == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          work="${RUNNER_TEMP}/data-branch-push"
+          rm -rf "$work"
+          mkdir -p "$work"
+          cd "$work"
+          git init --quiet
+          git remote add origin \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git fetch --quiet --depth 1 origin "$DATA_BRANCH"; then
+            git checkout --quiet -B "$DATA_BRANCH" FETCH_HEAD
+          else
+            git checkout --quiet -b "$DATA_BRANCH"
+            echo "$DATA_BRANCH を新規作成する"
+          fi
+
+          mkdir -p data/journal output/chatgpt
+          mkdir -p "$GITHUB_WORKSPACE/data/journal" "$GITHUB_WORKSPACE/output/chatgpt"
+          cp -R "$GITHUB_WORKSPACE/data/journal/." data/journal/
+          cp -R "$GITHUB_WORKSPACE/output/chatgpt/." output/chatgpt/
+
+          git add -f data/journal output/chatgpt
+          if git diff --cached --quiet; then
+            echo "保存すべき変更なし"
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit --quiet -m "daily screening data ${{ steps.market.outputs.market_date }}"
+          git push --quiet origin "$DATA_BRANCH"
+          echo "$DATA_BRANCH へ保存した"
+
+      - name: Summary
+        if: steps.market.outputs.has_new_data == 'true'
+        run: |
+          {
+            echo "## ChatGPT 用市場データ"
+            echo ""
+            echo "- データ基準日: ${{ steps.market.outputs.market_date }}"
+            echo "- artifact: \`chatgpt-market-data-${{ steps.market.outputs.market_date }}\`"
+            echo ""
+            echo '```'
+            cat "output/chatgpt/${{ steps.market.outputs.market_date }}/manifest.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

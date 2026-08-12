@@ -1,0 +1,212 @@
+# 案ごとの詳細集計。横並びの比較は variant_comparison.csv を見る。
+variant,variant_label,section,metric,value,note
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,INITIAL_HOLD,対象イベント数,32,near.max_position_in_range=0.65 で発生した ENTRY_CANDIDATE。前回と同一
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,INITIAL_HOLD,仮想ENTRYできた件数,32/32 (100%),ENTRY価格はシグナル翌営業日の始値
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,INITIAL_HOLD,上限を終値突破する前にSTOPした件数,10/32 (31%),TREND_HOLD へ到達しなかった件
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,INITIAL_HOLD,元レンジ上限を終値突破した件数（TREND_HOLD到達）,22/32 (69%),
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,INITIAL_HOLD,高値だけ上限を超えたが終値では超えなかった件数,10/32 (31%),状態遷移させていない（§3）
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,WARNING,上限突破後にWARNINGが発生した件数,22/22 (100%),警戒足の総数 31 本（前回は ENTRY 直後からの全陰線で 175 本）
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,WARNING,1イベントあたりの警戒足本数（中央値）,1.0 本,
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,WARNING,上限突破からWARNING発生までの営業日数（中央値）,1 日,最短 1 日 / 最長 4 日
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,WARNING,WARNING発生時の含み益率（中央値）,+1.00%,最初の警戒足の終値ベース。仮想ENTRY価格基準
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,WARNING,warning_low を先に割った警戒足,25/31 (81%),
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,WARNING,reference_high を先に更新した警戒足,3/31 (10%),
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,WARNING,同日に両方到達で順序不明の警戒足,3/31 (10%),AMBIGUOUS_WARNING_ORDER。CASE2 の EXIT 有無がこの順序に依存する
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,WARNING,決着前に active_stop へ到達した警戒足,0/31 (0%),
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,WARNING,追跡終端まで決着しなかった警戒足,0/31 (0%),
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,WARNING,warning_low を寄りでギャップ割れした警戒足,17/28 (61%),分母は warning_low を割った警戒足。warning_low での約定は仮定できない（§6A）
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,WARNING,警戒足が上限突破の翌営業日に出た件数,14/22 (64%),早すぎる警戒足の目安
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,REHIGH / TRAILING,REHIGH_CONFIRMED が発生した件数,9/32 (28%),再高値更新の総数 12 回
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,REHIGH / TRAILING,trail stop を1回以上引き上げられた件数,8/32 (25%),前回（既存 fractal 利用）は 参考A 2/32 / 参考B 10/32
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,REHIGH / TRAILING,trail stop を2回以上引き上げられた件数,2/32 (6%),
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,REHIGH / TRAILING,初期STOPからの引き上げ幅（中央値）,+7.47%,最大 +10.75%
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,REHIGH / TRAILING,押し安値の確定が既存 fractal より何日早いか（中央値）,-0 日,正なら状態機械の方が早い／負なら fractal の方が早い。最小 -4 日 / 最大 1 日（同じ安値を fractal も認めた 6 件が分母） 比較用で状態機械には使っていない
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,REHIGH / TRAILING,既存 fractal がそもそも押し安値と認めなかった件数,6/12 (50%),状態機械が確定した押し安値のうち、fractal の pivot 条件を満たさないもの
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,REHIGH / TRAILING,同日にSTOP到達と再高値更新で順序不明,0/32 (0%),当日安値が active_stop 以下なら押し安値も同水準以下になるため、どちらの順でも撤退水準は変わらない
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,REHIGH / TRAILING,warning_low を割ったのに WARNING に留まった件数,13/32 (41%),解釈(b) の副作用。CASE3 の構造的な弱点
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,利益保持,CASE1 初期STOPのみ（前回と同じ）: 仮想EXIT件数,31/32 (97%),残りは追跡終端で保有継続
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,利益保持,CASE1 初期STOPのみ（前回と同じ）: 仮想リターン中央値,-4.51%,仮想ENTRY価格（翌日始値）基準。約定価格は保証されない
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,利益保持,CASE1 初期STOPのみ（前回と同じ）: 最大含み益の中央値,+4.29%,
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,利益保持,CASE1 初期STOPのみ（前回と同じ）: 吐き出し幅の中央値,9.58pt,最大含み益 − 最終リターン
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,利益保持,CASE1 初期STOPのみ（前回と同じ）: 保有日数の中央値,8 日,
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,利益保持,CASE1 初期STOPのみ（前回と同じ）: +5%以上まで上昇後に損失,12/32 (38%),
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,利益保持,CASE1 初期STOPのみ（前回と同じ）: +10%以上から利益の過半を失った,6/32 (19%),「大半＝過半」を数式にしただけの集計定義。売買閾値ではない
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,利益保持,CASE2 warning_low 下抜けで利確: 仮想EXIT件数,32/32 (100%),残りは追跡終端で保有継続
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,利益保持,CASE2 warning_low 下抜けで利確: 仮想リターン中央値,-1.82%,仮想ENTRY価格（翌日始値）基準。約定価格は保証されない
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,利益保持,CASE2 warning_low 下抜けで利確: 最大含み益の中央値,+4.18%,
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,利益保持,CASE2 warning_low 下抜けで利確: 吐き出し幅の中央値,4.57pt,最大含み益 − 最終リターン
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,利益保持,CASE2 warning_low 下抜けで利確: 保有日数の中央値,5 日,
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,利益保持,CASE2 warning_low 下抜けで利確: +5%以上まで上昇後に損失,3/32 (9%),
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,利益保持,CASE2 warning_low 下抜けで利確: +10%以上から利益の過半を失った,1/32 (3%),「大半＝過半」を数式にしただけの集計定義。売買閾値ではない
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,利益保持,CASE3 トレーリング（warning_low では降りない）: 仮想EXIT件数,31/32 (97%),残りは追跡終端で保有継続
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,利益保持,CASE3 トレーリング（warning_low では降りない）: 仮想リターン中央値,-3.77%,仮想ENTRY価格（翌日始値）基準。約定価格は保証されない
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,利益保持,CASE3 トレーリング（warning_low では降りない）: 最大含み益の中央値,+4.29%,
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,利益保持,CASE3 トレーリング（warning_low では降りない）: 吐き出し幅の中央値,9.00pt,最大含み益 − 最終リターン
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,利益保持,CASE3 トレーリング（warning_low では降りない）: 保有日数の中央値,8 日,
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,利益保持,CASE3 トレーリング（warning_low では降りない）: +5%以上まで上昇後に損失,6/32 (19%),
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,利益保持,CASE3 トレーリング（warning_low では降りない）: +10%以上から利益の過半を失った,5/32 (16%),「大半＝過半」を数式にしただけの集計定義。売買閾値ではない
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,EXIT種別,CASE1 初期STOPのみ（前回と同じ）: INITIAL_STOP_EXIT,31/32 (97%),
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,EXIT種別,CASE1 初期STOPのみ（前回と同じ）: DATA_END_OPEN,1/32 (3%),
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,EXIT種別,CASE2 warning_low 下抜けで利確: WARNING_LOW_EXIT_CANDIDATE,21/32 (66%),
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,EXIT種別,CASE2 warning_low 下抜けで利確: INITIAL_STOP_EXIT,10/32 (31%),
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,EXIT種別,CASE2 warning_low 下抜けで利確: TRAIL_STOP_EXIT,1/32 (3%),
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,EXIT種別,CASE3 トレーリング（warning_low では降りない）: INITIAL_STOP_EXIT_AFTER_BREAKOUT,14/32 (44%),
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,EXIT種別,CASE3 トレーリング（warning_low では降りない）: INITIAL_STOP_EXIT,10/32 (31%),
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,EXIT種別,CASE3 トレーリング（warning_low では降りない）: TRAIL_STOP_EXIT,7/32 (22%),
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,EXIT種別,CASE3 トレーリング（warning_low では降りない）: DATA_END_OPEN,1/32 (3%),
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,経路の分類,P0 上限を終値突破せずSTOP（TREND_HOLDへ到達せず）,10/32 (31%),
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,経路の分類,P2 警戒足 → warning_low 下抜け（再高値更新なし）,13/32 (41%),
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,経路の分類,P3 警戒足 → 再高値更新1回 → STOP引き上げ,7/32 (22%),
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,経路の分類,P4 再高値更新2回以上（複数回の押し安値形成）,2/32 (6%),
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,フラグ,CASE2 の方が CASE3 より有利な撤退になった,18/32 (56%),
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,フラグ,warning_low を寄りでギャップ割れ（約定を仮定できない）,14/32 (44%),
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,フラグ,警戒足が上限突破の翌営業日に出た,14/32 (44%),
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,フラグ,warning_low を割ったのに WARNING に留まり続けた（解釈(b)）,13/32 (41%),
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,フラグ,CASE1 で +5%以上まで上昇後に損失,12/32 (38%),
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,フラグ,active_stop を1回以上引き上げた,8/32 (25%),
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,フラグ,CASE3 の方が CASE1 より有利な撤退になった,7/32 (22%),
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,フラグ,同日に warning_low 下抜けと再高値更新（順序不明）,3/32 (9%),
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,フラグ,active_stop を2回以上引き上げた,2/32 (6%),
+A,VARIANT A 上限を終値突破した翌営業日から（現行案・比較基準）,解釈の感度,上限突破日・再高値更新日そのものが陰線だった回数,5,解釈(a)で同日採用にしていたら、この回数だけ警戒足が増えていた
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,INITIAL_HOLD,対象イベント数,32,near.max_position_in_range=0.65 で発生した ENTRY_CANDIDATE。前回と同一
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,INITIAL_HOLD,仮想ENTRYできた件数,32/32 (100%),ENTRY価格はシグナル翌営業日の始値
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,INITIAL_HOLD,上限を終値突破する前にSTOPした件数,10/32 (31%),TREND_HOLD へ到達しなかった件
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,INITIAL_HOLD,元レンジ上限を終値突破した件数（TREND_HOLD到達）,22/32 (69%),
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,INITIAL_HOLD,高値だけ上限を超えたが終値では超えなかった件数,10/32 (31%),状態遷移させていない（§3）
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,WARNING,上限突破後にWARNINGが発生した件数,16/22 (73%),警戒足の総数 21 本（前回は ENTRY 直後からの全陰線で 175 本）
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,WARNING,1イベントあたりの警戒足本数（中央値）,1.0 本,
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,WARNING,上限突破からWARNING発生までの営業日数（中央値）,3 日,最短 2 日 / 最長 14 日
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,WARNING,WARNING発生時の含み益率（中央値）,+3.17%,最初の警戒足の終値ベース。仮想ENTRY価格基準
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,WARNING,warning_low を先に割った警戒足,19/21 (90%),
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,WARNING,reference_high を先に更新した警戒足,0/21 (0%),
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,WARNING,同日に両方到達で順序不明の警戒足,2/21 (10%),AMBIGUOUS_WARNING_ORDER。CASE2 の EXIT 有無がこの順序に依存する
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,WARNING,決着前に active_stop へ到達した警戒足,0/21 (0%),
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,WARNING,追跡終端まで決着しなかった警戒足,0/21 (0%),
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,WARNING,warning_low を寄りでギャップ割れした警戒足,14/21 (67%),分母は warning_low を割った警戒足。warning_low での約定は仮定できない（§6A）
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,WARNING,警戒足が上限突破の翌営業日に出た件数,0/22 (0%),早すぎる警戒足の目安
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,REHIGH / TRAILING,REHIGH_CONFIRMED が発生した件数,6/32 (19%),再高値更新の総数 7 回
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,REHIGH / TRAILING,trail stop を1回以上引き上げられた件数,5/32 (16%),前回（既存 fractal 利用）は 参考A 2/32 / 参考B 10/32
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,REHIGH / TRAILING,trail stop を2回以上引き上げられた件数,1/32 (3%),
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,REHIGH / TRAILING,初期STOPからの引き上げ幅（中央値）,+8.68%,最大 +10.75%
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,REHIGH / TRAILING,押し安値の確定が既存 fractal より何日早いか（中央値）,-0 日,正なら状態機械の方が早い／負なら fractal の方が早い。最小 -1 日 / 最大 1 日（同じ安値を fractal も認めた 4 件が分母） 比較用で状態機械には使っていない
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,REHIGH / TRAILING,既存 fractal がそもそも押し安値と認めなかった件数,3/7 (43%),状態機械が確定した押し安値のうち、fractal の pivot 条件を満たさないもの
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,REHIGH / TRAILING,同日にSTOP到達と再高値更新で順序不明,0/32 (0%),当日安値が active_stop 以下なら押し安値も同水準以下になるため、どちらの順でも撤退水準は変わらない
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,REHIGH / TRAILING,warning_low を割ったのに WARNING に留まった件数,8/32 (25%),解釈(b) の副作用。CASE3 の構造的な弱点
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,利益保持,CASE1 初期STOPのみ（前回と同じ）: 仮想EXIT件数,31/32 (97%),残りは追跡終端で保有継続
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,利益保持,CASE1 初期STOPのみ（前回と同じ）: 仮想リターン中央値,-4.51%,仮想ENTRY価格（翌日始値）基準。約定価格は保証されない
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,利益保持,CASE1 初期STOPのみ（前回と同じ）: 最大含み益の中央値,+4.29%,
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,利益保持,CASE1 初期STOPのみ（前回と同じ）: 吐き出し幅の中央値,9.58pt,最大含み益 − 最終リターン
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,利益保持,CASE1 初期STOPのみ（前回と同じ）: 保有日数の中央値,8 日,
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,利益保持,CASE1 初期STOPのみ（前回と同じ）: +5%以上まで上昇後に損失,12/32 (38%),
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,利益保持,CASE1 初期STOPのみ（前回と同じ）: +10%以上から利益の過半を失った,6/32 (19%),「大半＝過半」を数式にしただけの集計定義。売買閾値ではない
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,利益保持,CASE2 warning_low 下抜けで利確: 仮想EXIT件数,32/32 (100%),残りは追跡終端で保有継続
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,利益保持,CASE2 warning_low 下抜けで利確: 仮想リターン中央値,-2.85%,仮想ENTRY価格（翌日始値）基準。約定価格は保証されない
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,利益保持,CASE2 warning_low 下抜けで利確: 最大含み益の中央値,+4.18%,
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,利益保持,CASE2 warning_low 下抜けで利確: 吐き出し幅の中央値,6.92pt,最大含み益 − 最終リターン
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,利益保持,CASE2 warning_low 下抜けで利確: 保有日数の中央値,6 日,
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,利益保持,CASE2 warning_low 下抜けで利確: +5%以上まで上昇後に損失,5/32 (16%),
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,利益保持,CASE2 warning_low 下抜けで利確: +10%以上から利益の過半を失った,1/32 (3%),「大半＝過半」を数式にしただけの集計定義。売買閾値ではない
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,利益保持,CASE3 トレーリング（warning_low では降りない）: 仮想EXIT件数,31/32 (97%),残りは追跡終端で保有継続
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,利益保持,CASE3 トレーリング（warning_low では降りない）: 仮想リターン中央値,-4.33%,仮想ENTRY価格（翌日始値）基準。約定価格は保証されない
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,利益保持,CASE3 トレーリング（warning_low では降りない）: 最大含み益の中央値,+4.29%,
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,利益保持,CASE3 トレーリング（warning_low では降りない）: 吐き出し幅の中央値,9.00pt,最大含み益 − 最終リターン
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,利益保持,CASE3 トレーリング（warning_low では降りない）: 保有日数の中央値,8 日,
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,利益保持,CASE3 トレーリング（warning_low では降りない）: +5%以上まで上昇後に損失,8/32 (25%),
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,利益保持,CASE3 トレーリング（warning_low では降りない）: +10%以上から利益の過半を失った,5/32 (16%),「大半＝過半」を数式にしただけの集計定義。売買閾値ではない
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,EXIT種別,CASE1 初期STOPのみ（前回と同じ）: INITIAL_STOP_EXIT,31/32 (97%),
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,EXIT種別,CASE1 初期STOPのみ（前回と同じ）: DATA_END_OPEN,1/32 (3%),
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,EXIT種別,CASE2 warning_low 下抜けで利確: WARNING_LOW_EXIT_CANDIDATE,16/32 (50%),
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,EXIT種別,CASE2 warning_low 下抜けで利確: INITIAL_STOP_EXIT,10/32 (31%),
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,EXIT種別,CASE2 warning_low 下抜けで利確: INITIAL_STOP_EXIT_AFTER_BREAKOUT,6/32 (19%),
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,EXIT種別,CASE3 トレーリング（warning_low では降りない）: INITIAL_STOP_EXIT_AFTER_BREAKOUT,17/32 (53%),
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,EXIT種別,CASE3 トレーリング（warning_low では降りない）: INITIAL_STOP_EXIT,10/32 (31%),
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,EXIT種別,CASE3 トレーリング（warning_low では降りない）: TRAIL_STOP_EXIT,4/32 (12%),
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,EXIT種別,CASE3 トレーリング（warning_low では降りない）: DATA_END_OPEN,1/32 (3%),
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,経路の分類,P0 上限を終値突破せずSTOP（TREND_HOLDへ到達せず）,10/32 (31%),
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,経路の分類,P1 突破したが警戒足が出る前にSTOP,6/32 (19%),
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,経路の分類,P2 警戒足 → warning_low 下抜け（再高値更新なし）,10/32 (31%),
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,経路の分類,P3 警戒足 → 再高値更新1回 → STOP引き上げ,5/32 (16%),
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,経路の分類,P4 再高値更新2回以上（複数回の押し安値形成）,1/32 (3%),
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,フラグ,CASE2 の方が CASE3 より有利な撤退になった,14/32 (44%),
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,フラグ,CASE1 で +5%以上まで上昇後に損失,12/32 (38%),
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,フラグ,warning_low を寄りでギャップ割れ（約定を仮定できない）,12/32 (38%),
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,フラグ,warning_low を割ったのに WARNING に留まり続けた（解釈(b)）,8/32 (25%),
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,フラグ,警戒足が UPTREND_CONFIRMED の翌営業日に出た（B/C）,8/32 (25%),
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,フラグ,上限突破したが UPTREND_CONFIRMED が来ないまま終わった（B/C）,6/32 (19%),
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,フラグ,active_stop を1回以上引き上げた,5/32 (16%),
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,フラグ,CASE3 の方が CASE1 より有利な撤退になった,4/32 (12%),
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,フラグ,UPTREND_CONFIRMED の日そのものが陰線だった（§11）,4/32 (12%),
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,フラグ,同日に warning_low 下抜けと再高値更新（順序不明）,2/32 (6%),
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,フラグ,active_stop を2回以上引き上げた,1/32 (3%),
+B,VARIANT B 高値更新確認後（high > breakout_day_high）,解釈の感度,上限突破日・再高値更新日そのものが陰線だった回数,4,解釈(a)で同日採用にしていたら、この回数だけ警戒足が増えていた
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,INITIAL_HOLD,対象イベント数,32,near.max_position_in_range=0.65 で発生した ENTRY_CANDIDATE。前回と同一
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,INITIAL_HOLD,仮想ENTRYできた件数,32/32 (100%),ENTRY価格はシグナル翌営業日の始値
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,INITIAL_HOLD,上限を終値突破する前にSTOPした件数,10/32 (31%),TREND_HOLD へ到達しなかった件
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,INITIAL_HOLD,元レンジ上限を終値突破した件数（TREND_HOLD到達）,22/32 (69%),
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,INITIAL_HOLD,高値だけ上限を超えたが終値では超えなかった件数,10/32 (31%),状態遷移させていない（§3）
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,WARNING,上限突破後にWARNINGが発生した件数,14/22 (64%),警戒足の総数 18 本（前回は ENTRY 直後からの全陰線で 175 本）
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,WARNING,1イベントあたりの警戒足本数（中央値）,1.0 本,
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,WARNING,上限突破からWARNING発生までの営業日数（中央値）,3 日,最短 2 日 / 最長 14 日
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,WARNING,WARNING発生時の含み益率（中央値）,+4.23%,最初の警戒足の終値ベース。仮想ENTRY価格基準
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,WARNING,warning_low を先に割った警戒足,16/18 (89%),
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,WARNING,reference_high を先に更新した警戒足,0/18 (0%),
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,WARNING,同日に両方到達で順序不明の警戒足,2/18 (11%),AMBIGUOUS_WARNING_ORDER。CASE2 の EXIT 有無がこの順序に依存する
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,WARNING,決着前に active_stop へ到達した警戒足,0/18 (0%),
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,WARNING,追跡終端まで決着しなかった警戒足,0/18 (0%),
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,WARNING,warning_low を寄りでギャップ割れした警戒足,13/18 (72%),分母は warning_low を割った警戒足。warning_low での約定は仮定できない（§6A）
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,WARNING,警戒足が上限突破の翌営業日に出た件数,0/22 (0%),早すぎる警戒足の目安
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,REHIGH / TRAILING,REHIGH_CONFIRMED が発生した件数,5/32 (16%),再高値更新の総数 6 回
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,REHIGH / TRAILING,trail stop を1回以上引き上げられた件数,4/32 (12%),前回（既存 fractal 利用）は 参考A 2/32 / 参考B 10/32
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,REHIGH / TRAILING,trail stop を2回以上引き上げられた件数,1/32 (3%),
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,REHIGH / TRAILING,初期STOPからの引き上げ幅（中央値）,+8.71%,最大 +10.75%
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,REHIGH / TRAILING,押し安値の確定が既存 fractal より何日早いか（中央値）,-1 日,正なら状態機械の方が早い／負なら fractal の方が早い。最小 -1 日 / 最大 0 日（同じ安値を fractal も認めた 3 件が分母） 比較用で状態機械には使っていない
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,REHIGH / TRAILING,既存 fractal がそもそも押し安値と認めなかった件数,3/6 (50%),状態機械が確定した押し安値のうち、fractal の pivot 条件を満たさないもの
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,REHIGH / TRAILING,同日にSTOP到達と再高値更新で順序不明,0/32 (0%),当日安値が active_stop 以下なら押し安値も同水準以下になるため、どちらの順でも撤退水準は変わらない
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,REHIGH / TRAILING,warning_low を割ったのに WARNING に留まった件数,8/32 (25%),解釈(b) の副作用。CASE3 の構造的な弱点
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,利益保持,CASE1 初期STOPのみ（前回と同じ）: 仮想EXIT件数,31/32 (97%),残りは追跡終端で保有継続
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,利益保持,CASE1 初期STOPのみ（前回と同じ）: 仮想リターン中央値,-4.51%,仮想ENTRY価格（翌日始値）基準。約定価格は保証されない
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,利益保持,CASE1 初期STOPのみ（前回と同じ）: 最大含み益の中央値,+4.29%,
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,利益保持,CASE1 初期STOPのみ（前回と同じ）: 吐き出し幅の中央値,9.58pt,最大含み益 − 最終リターン
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,利益保持,CASE1 初期STOPのみ（前回と同じ）: 保有日数の中央値,8 日,
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,利益保持,CASE1 初期STOPのみ（前回と同じ）: +5%以上まで上昇後に損失,12/32 (38%),
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,利益保持,CASE1 初期STOPのみ（前回と同じ）: +10%以上から利益の過半を失った,6/32 (19%),「大半＝過半」を数式にしただけの集計定義。売買閾値ではない
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,利益保持,CASE2 warning_low 下抜けで利確: 仮想EXIT件数,32/32 (100%),残りは追跡終端で保有継続
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,利益保持,CASE2 warning_low 下抜けで利確: 仮想リターン中央値,-2.85%,仮想ENTRY価格（翌日始値）基準。約定価格は保証されない
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,利益保持,CASE2 warning_low 下抜けで利確: 最大含み益の中央値,+4.18%,
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,利益保持,CASE2 warning_low 下抜けで利確: 吐き出し幅の中央値,6.92pt,最大含み益 − 最終リターン
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,利益保持,CASE2 warning_low 下抜けで利確: 保有日数の中央値,6 日,
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,利益保持,CASE2 warning_low 下抜けで利確: +5%以上まで上昇後に損失,5/32 (16%),
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,利益保持,CASE2 warning_low 下抜けで利確: +10%以上から利益の過半を失った,1/32 (3%),「大半＝過半」を数式にしただけの集計定義。売買閾値ではない
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,利益保持,CASE3 トレーリング（warning_low では降りない）: 仮想EXIT件数,31/32 (97%),残りは追跡終端で保有継続
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,利益保持,CASE3 トレーリング（warning_low では降りない）: 仮想リターン中央値,-4.51%,仮想ENTRY価格（翌日始値）基準。約定価格は保証されない
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,利益保持,CASE3 トレーリング（warning_low では降りない）: 最大含み益の中央値,+4.29%,
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,利益保持,CASE3 トレーリング（warning_low では降りない）: 吐き出し幅の中央値,9.00pt,最大含み益 − 最終リターン
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,利益保持,CASE3 トレーリング（warning_low では降りない）: 保有日数の中央値,8 日,
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,利益保持,CASE3 トレーリング（warning_low では降りない）: +5%以上まで上昇後に損失,9/32 (28%),
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,利益保持,CASE3 トレーリング（warning_low では降りない）: +10%以上から利益の過半を失った,5/32 (16%),「大半＝過半」を数式にしただけの集計定義。売買閾値ではない
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,EXIT種別,CASE1 初期STOPのみ（前回と同じ）: INITIAL_STOP_EXIT,31/32 (97%),
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,EXIT種別,CASE1 初期STOPのみ（前回と同じ）: DATA_END_OPEN,1/32 (3%),
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,EXIT種別,CASE2 warning_low 下抜けで利確: WARNING_LOW_EXIT_CANDIDATE,14/32 (44%),
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,EXIT種別,CASE2 warning_low 下抜けで利確: INITIAL_STOP_EXIT,10/32 (31%),
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,EXIT種別,CASE2 warning_low 下抜けで利確: INITIAL_STOP_EXIT_AFTER_BREAKOUT,8/32 (25%),
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,EXIT種別,CASE3 トレーリング（warning_low では降りない）: INITIAL_STOP_EXIT_AFTER_BREAKOUT,18/32 (56%),
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,EXIT種別,CASE3 トレーリング（warning_low では降りない）: INITIAL_STOP_EXIT,10/32 (31%),
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,EXIT種別,CASE3 トレーリング（warning_low では降りない）: TRAIL_STOP_EXIT,3/32 (9%),
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,EXIT種別,CASE3 トレーリング（warning_low では降りない）: DATA_END_OPEN,1/32 (3%),
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,経路の分類,P0 上限を終値突破せずSTOP（TREND_HOLDへ到達せず）,10/32 (31%),
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,経路の分類,P1 突破したが警戒足が出る前にSTOP,8/32 (25%),
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,経路の分類,P2 警戒足 → warning_low 下抜け（再高値更新なし）,9/32 (28%),
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,経路の分類,P3 警戒足 → 再高値更新1回 → STOP引き上げ,4/32 (12%),
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,経路の分類,P4 再高値更新2回以上（複数回の押し安値形成）,1/32 (3%),
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,フラグ,CASE2 の方が CASE3 より有利な撤退になった,13/32 (41%),
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,フラグ,CASE1 で +5%以上まで上昇後に損失,12/32 (38%),
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,フラグ,warning_low を寄りでギャップ割れ（約定を仮定できない）,11/32 (34%),
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,フラグ,warning_low を割ったのに WARNING に留まり続けた（解釈(b)）,8/32 (25%),
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,フラグ,上限突破したが UPTREND_CONFIRMED が来ないまま終わった（B/C）,8/32 (25%),
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,フラグ,警戒足が UPTREND_CONFIRMED の翌営業日に出た（B/C）,6/32 (19%),
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,フラグ,active_stop を1回以上引き上げた,4/32 (12%),
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,フラグ,CASE3 の方が CASE1 より有利な撤退になった,3/32 (9%),
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,フラグ,同日に warning_low 下抜けと再高値更新（順序不明）,2/32 (6%),
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,フラグ,UPTREND_CONFIRMED の日そのものが陰線だった（§11）,1/32 (3%),
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,フラグ,active_stop を2回以上引き上げた,1/32 (3%),
+C,VARIANT C 終値上昇確認後（close > breakout_day_close）,解釈の感度,上限突破日・再高値更新日そのものが陰線だった回数,4,解釈(a)で同日採用にしていたら、この回数だけ警戒足が増えていた
