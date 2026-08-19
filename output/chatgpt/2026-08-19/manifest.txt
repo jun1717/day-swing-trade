@@ -1,0 +1,33 @@
+# ChatGPT 分析用データ (swing-screener chatgpt-export)
+generated_at=2026-08-19T07:49:41+00:00
+generated_at_market_tz=2026-08-19T16:49:41+09:00
+market_data_as_of=2026-08-19
+session_status=FINAL
+is_finalized=true
+market_timezone=Asia/Tokyo
+session_close_time=15:30
+session_finalize_after=16:00
+git_commit_sha=f9ed0bf2df20437aa1c3aacafc8a5665f7208ce0
+screener_version=0.1.0
+universe_count=98
+candidate_count=2
+entry_candidate_count=0
+near_count=1
+range_count=1
+out_count=96
+bars_count=140
+bar_lookback_days=70
+candidates_file=candidates.csv
+daily_bars_file=daily_bars.csv
+config_file=config.yaml
+config_sha256=77fcc93eab4dc6e5fd1420204d434e95ad07d80c2279abdaadf410123b40e459
+experimental_file=experimental.yaml
+experimental_sha256=e82d37fff7d91df18d794122df848b3653d794f380a5e97d99840c3696021b91
+
+# このデータの性格
+This bundle is analysis input only. Production trading logic was not recalculated or modified by this export.
+このデータは分析のための入力です。本番の売買判定は、この書き出しによって再計算も変更もされていません。
+candidates.csv の値と reason 列は、本番スクリーニング結果（ScreenResult / Judgement）をそのまま写したものです。この書き出しでレンジ判定・ENTRY判定・レンジ内位置の再評価は行っていません。
+daily_bars.csv は生の日足と MA25 だけです。その日には存在しなかった判定結果を過去の行へ埋め込んでいません。
+OUT の銘柄は含みません。候補が 0 件の日は candidate_count=0 で、CSV はヘッダーのみになります（条件を緩めて候補を作ることはしません）。
+session_status が FINAL の bundle は、market_data_as_of の取引が終了したあとの確定日足で作られたものです（Asia/Tokyo 16:00 以降（大引け 15:30 + データ確定待ち））。永続化・artifact 化されるのは FINAL の bundle だけです。
